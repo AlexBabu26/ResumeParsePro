@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page|title }} • Parse Pro AI{% endblock %}
+
+{% block content %}
+<div id="pageRoot"
+     data-page="{{ page }}"
+     data-run-id="{{ run_id|default:'' }}"
+     data-candidate-id="{{ candidate_id|default:'' }}">
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/pages.js' %}"></script>
+{% endblock %}
+
