@@ -425,26 +425,80 @@ def _candidate_meets_requirements(candidate: Candidate, requirements: dict, use_
         return _candidate_meets_requirements_string(candidate, requirements)
 
 
-class ResumeDocumentViewSet(viewsets.ReadOnlyModelViewSet):
+class ResumeDocumentViewSet(viewsets.ModelViewSet):
     serializer_class = ResumeDocumentSerializer
     permission_classes = [permissions.IsAuthenticated]
+    # Only allow list, retrieve, destroy (no create/update via this viewset)
+    http_method_names = ['get', 'delete', 'head', 'options']
 
     def get_queryset(self):
         # (3) Ownership filtering
         return ResumeDocument.objects.filter(uploaded_by=self.request.user).order_by("-created_at")
 
+    def destroy(self, request, *args, **kwargs):
+        """Delete a resume document and all associated parse runs and candidates (cascade)."""
+        instance = self.get_object()
+        doc_id = instance.id
+        filename = instance.original_filename
+        
+        # Count related objects before deletion (for logging)
+        parse_runs_count = instance.parse_runs.count()
+        candidates_count = instance.candidate_profiles.count()
+        
+        # Delete the file from filesystem if it exists
+        if instance.file:
+            try:
+                instance.file.delete(save=False)
+            except Exception as e:
+                logger.warning(f"Failed to delete file for ResumeDocument {doc_id}: {e}")
+        
+        # Delete the document (cascade will delete parse_runs and candidates)
+        instance.delete()
+        
+        logger.info(f"ResumeDocument {doc_id} deleted by user {request.user.id}", extra={
+            "document_id": doc_id,
+            "file_name": filename,
+            "parse_runs_deleted": parse_runs_count,
+            "candidates_deleted": candidates_count,
+        })
+        
+        return ok({
+            "message": f"Document '{filename}' deleted successfully",
+            "parse_runs_deleted": parse_runs_count,
+            "candidates_deleted": candidates_count,
+        })
 
-class ParseRunViewSet(viewsets.ReadOnlyModelViewSet):
+
+class ParseRunViewSet(viewsets.ModelViewSet):
     serializer_class = ParseRunSerializer
     permission_classes = [permissions.IsAuthenticated]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "parse_retry"
+    # Only allow list, retrieve, destroy, and retry action (no create/update via this viewset)
+    http_method_names = ['get', 'post', 'delete', 'head', 'options']
 
     def get_queryset(self):
         # (3) Ownership filtering
         return ParseRun.objects.select_related("resume_document").filter(
             resume_document__uploaded_by=self.request.user
         ).order_by("-created_at")
+
+    def destroy(self, request, *args, **kwargs):
+        """Delete a parse run and its associated candidate (if any)."""
+        instance = self.get_object()
+        run_id = instance.id
+        
+        # Also delete associated candidate if exists
+        from candidates.models import Candidate
+        deleted_candidate = Candidate.objects.filter(parse_run=instance).delete()[0]
+        
+        instance.delete()
+        logger.info(f"ParseRun {run_id} deleted by user {request.user.id}")
+        
+        return ok({
+            "message": f"Parse run #{run_id} deleted successfully",
+            "deleted_candidate": deleted_candidate > 0
+        })
 
     @action(detail=True, methods=["post"])
     def retry(self, request, pk=None):
@@ -553,7 +607,7 @@ class ResumeUploadViewSet(viewsets.ViewSet):
             
             logger.info("Starting text extraction", extra={
                 "document_id": doc.id,
-                "filename": doc.original_filename,
+                "file_name": doc.original_filename,
                 "mime_type": doc.mime_type,
             })
 
@@ -573,7 +627,7 @@ class ResumeUploadViewSet(viewsets.ViewSet):
                 # Default to DOCX extraction for unknown types
                 logger.warning("Unknown file type, attempting DOCX extraction", extra={
                     "document_id": doc.id,
-                    "filename": name,
+                    "file_name": name,
                 })
                 raw = _extract_text_from_docx(file_path)
                 doc.extraction_method = "python-docx"

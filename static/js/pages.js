@@ -573,7 +573,7 @@
         <div class="table-responsive">
           <table class="table align-middle">
             <thead>
-              <tr><th>ID</th><th>Filename</th><th>MIME</th><th>Size</th><th>Hash</th><th>Extract</th><th>Created</th></tr>
+              <tr><th>ID</th><th>Filename</th><th>MIME</th><th>Size</th><th>Hash</th><th>Extract</th><th>Created</th><th></th></tr>
             </thead>
             <tbody id="docsBody"></tbody>
           </table>
@@ -600,7 +600,7 @@
 
     for (const d of docs) {
       body.insertAdjacentHTML("beforeend", `
-        <tr>
+        <tr data-doc-id="${d.id}">
           <td class="mono">${d.id}</td>
           <td>${esc(d.original_filename || "—")}</td>
           <td class="small">${esc(d.mime_type || "—")}</td>
@@ -608,9 +608,42 @@
           <td class="small mono">${esc((d.file_hash || "").slice(0, 12) || "—")}</td>
           <td class="small">${esc(d.extraction_method || "—")}</td>
           <td class="small">${fmtDate(d.created_at)}</td>
+          <td class="text-end">
+            <button class="btn btn-outline-danger btn-sm delete-doc-btn" data-id="${d.id}" title="Delete"><i class="bi bi-trash"></i></button>
+          </td>
         </tr>
       `);
     }
+
+    // Attach delete handlers
+    body.querySelectorAll(".delete-doc-btn").forEach(btn => {
+      btn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        const id = btn.dataset.id;
+        const filename = body.querySelector(`tr[data-doc-id="${id}"] td:nth-child(2)`)?.textContent?.trim() || `#${id}`;
+        if (!confirm(`Delete document "${filename}"? This will also delete all associated parse runs and candidates.`)) return;
+        btn.disabled = true;
+        try {
+          const resp = await ParsePro.apiFetch(`/resume-documents/${id}/`, { method: "DELETE" });
+          if (resp.ok) {
+            const data = await resp.json().catch(() => null);
+            const msg = data?.data?.message || `Document deleted`;
+            ParsePro.toast("Deleted", msg, "success");
+            const row = body.querySelector(`tr[data-doc-id="${id}"]`);
+            if (row) row.remove();
+            // Update empty state
+            $("docsEmpty").classList.toggle("d-none", body.children.length > 0);
+          } else {
+            const data = await resp.json().catch(() => null);
+            ParsePro.toast("Error", data?.error?.message || "Delete failed", "danger");
+          }
+        } catch (err) {
+          ParsePro.toast("Error", err.message || "Delete failed", "danger");
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
   }
 
   // ---------------- Parse Runs list + detail
@@ -694,16 +727,44 @@
 
       for (const x of results) {
         body.insertAdjacentHTML("beforeend", `
-          <tr>
+          <tr data-run-id="${x.id}">
             <td class="mono">${x.id}</td>
             <td>${badge(x.status)}</td>
             <td class="small">${esc(x.model_name || "—")}</td>
             <td class="small">${x.latency_ms ? x.latency_ms + " ms" : "—"}</td>
             <td class="small">${fmtDate(x.created_at)}</td>
-            <td class="text-end"><a class="btn btn-outline-dark btn-sm" href="/resumes/parse-runs/${x.id}/">Open</a></td>
+            <td class="text-end">
+              <a class="btn btn-outline-dark btn-sm" href="/resumes/parse-runs/${x.id}/">Open</a>
+              <button class="btn btn-outline-danger btn-sm ms-1 delete-run-btn" data-id="${x.id}" title="Delete"><i class="bi bi-trash"></i></button>
+            </td>
           </tr>
         `);
       }
+
+      // Attach delete handlers
+      body.querySelectorAll(".delete-run-btn").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+          e.preventDefault();
+          const id = btn.dataset.id;
+          if (!confirm(`Delete parse run #${id}? This will also delete any associated candidate.`)) return;
+          btn.disabled = true;
+          try {
+            const resp = await ParsePro.apiFetch(`/parse-runs/${id}/`, { method: "DELETE" });
+            if (resp.ok) {
+              ParsePro.toast("Deleted", `Parse run #${id} deleted`, "success");
+              const row = body.querySelector(`tr[data-run-id="${id}"]`);
+              if (row) row.remove();
+            } else {
+              const data = await resp.json().catch(() => null);
+              ParsePro.toast("Error", data?.error?.message || "Delete failed", "danger");
+            }
+          } catch (err) {
+            ParsePro.toast("Error", err.message || "Delete failed", "danger");
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
     }
 
     // initial from URL params
@@ -752,6 +813,7 @@
         </div>
         <div class="d-flex gap-2">
           <button class="btn btn-outline-dark" id="retryBtn"><i class="bi bi-arrow-repeat me-2"></i>Retry</button>
+          <button class="btn btn-outline-danger" id="deleteRunBtn"><i class="bi bi-trash me-2"></i>Delete</button>
           <a class="btn btn-dark" href="/resumes/parse-runs/"><i class="bi bi-arrow-left me-2"></i>Back</a>
         </div>
       </div>
@@ -877,6 +939,26 @@
         window.location.href = `/resumes/parse-runs/${newRunId}/`;
       } catch (err) {
         ParsePro.toast("Retry", err.message || "Retry failed", "danger");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    $("deleteRunBtn").addEventListener("click", async () => {
+      if (!confirm(`Delete parse run #${runId}? This will also delete any associated candidate.`)) return;
+      const btn = $("deleteRunBtn");
+      btn.disabled = true;
+      try {
+        const resp = await ParsePro.apiFetch(`/parse-runs/${runId}/`, { method: "DELETE" });
+        if (resp.ok) {
+          ParsePro.toast("Deleted", `Parse run #${runId} deleted`, "success");
+          window.location.href = "/resumes/parse-runs/";
+        } else {
+          const data = await resp.json().catch(() => null);
+          ParsePro.toast("Error", data?.error?.message || "Delete failed", "danger");
+        }
+      } catch (err) {
+        ParsePro.toast("Error", err.message || "Delete failed", "danger");
       } finally {
         btn.disabled = false;
       }
