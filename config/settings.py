@@ -156,14 +156,14 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.ScopedRateThrottle',
     ),
     'DEFAULT_THROTTLE_RATES': {
-        # baseline
-        'user': '600/hour',
-        'anon': '50/hour',
+        # baseline - increased for development
+        'user': '3000/hour',
+        'anon': '200/hour',
         # scoped throttles (set per-view via throttle_scope)
-        'resumes_upload': '30/hour',
-        'parse_retry': '20/hour',
-        'candidate_patch': '120/hour',
-        'candidates_export': '30/hour',
+        'resumes_upload': '100/hour',
+        'parse_retry': '60/hour',
+        'candidate_patch': '300/hour',
+        'candidates_export': '60/hour',
     },
 }
 
@@ -184,15 +184,18 @@ SIMPLE_JWT = {
 }
 
 # OpenRouter configuration
-OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', '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')
+OPENROUTER_API_KEY = "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"
 
-# Extraction (already used)
-OPENROUTER_EXTRACT_MODEL = "xiaomi/mimo-v2-flash:free"
+# Extraction model - using Nvidia Nemotron free tier
+# Options: "nvidia/nemotron-3-nano-30b-a3b:free" (free)
+#          "google/gemini-2.0-flash-exp:free" (free, rate limited)
+#          "openai/gpt-4o-mini" (paid, requires credits)
+OPENROUTER_EXTRACT_MODEL = os.getenv('OPENROUTER_EXTRACT_MODEL', 'nvidia/nemotron-3-nano-30b-a3b:free')
 OPENROUTER_TEMPERATURE = float(os.getenv('OPENROUTER_TEMPERATURE', '0.1'))
 
-# NEW: classification + summary models
-OPENROUTER_CLASSIFY_MODEL = "xiaomi/mimo-v2-flash:free"
-OPENROUTER_SUMMARY_MODEL = "xiaomi/mimo-v2-flash:free"
+# Classification + summary models
+OPENROUTER_CLASSIFY_MODEL = os.getenv('OPENROUTER_CLASSIFY_MODEL', 'nvidia/nemotron-3-nano-30b-a3b:free')
+OPENROUTER_SUMMARY_MODEL = os.getenv('OPENROUTER_SUMMARY_MODEL', 'nvidia/nemotron-3-nano-30b-a3b:free')
 
 # NEW: keep these low for determinism
 OPENROUTER_CLASSIFY_TEMPERATURE = float(os.getenv('OPENROUTER_CLASSIFY_TEMPERATURE', '0.1'))
