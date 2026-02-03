@@ -1,0 +1,18 @@
+body { min-height: 100vh; }
+.sidebar { min-height: calc(100vh - 56px); }
+
+.json-pre {
+  max-height: 420px;
+  overflow: auto;
+  padding: 12px;
+  background: #0b1020;
+  color: #e9eefc;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.10);
+  font-size: 12px;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
