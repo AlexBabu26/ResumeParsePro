@@ -134,7 +134,7 @@
     r.el.innerHTML = `
       <div class="mb-3">
         <h1 class="h3 mb-1">Upload Resume</h1>
-        <div class="text-muted">Upload PDF/DOCX. The system extracts, normalizes, validates schema, classifies, and summarizes.</div>
+        <div class="text-muted">Upload PDF/DOCX files. The system extracts, normalizes, validates, classifies, and summarizes.</div>
       </div>
 
       <div class="row g-3">
@@ -143,21 +143,53 @@
             <div id="uploadAlert"></div>
             <form id="uploadForm">
               <div class="mb-3">
-                <label class="form-label">Resume file(s) (PDF/DOCX)</label>
-                <input type="file" class="form-control" name="file" id="fileInput" accept=".pdf,.doc,.docx" required>
-                <div class="form-text">Select one or multiple files (hold Ctrl/Cmd to select multiple)</div>
+                <label class="form-label fw-semibold">
+                  <i class="bi bi-file-earmark-arrow-up me-1"></i>
+                  Select Resume Files
+                </label>
+                <div class="position-relative">
+                  <input type="file" class="form-control" name="file" id="fileInput" accept=".pdf,.doc,.docx,.txt" multiple required>
+                  <div class="form-text">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Supported formats: PDF, DOCX, DOC, TXT (max 10MB each)
+                  </div>
+                </div>
+              </div>
+
+              <!-- File Preview List -->
+              <div class="mb-3 d-none" id="filePreviewSection">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                  <label class="form-label fw-semibold mb-0">
+                    <i class="bi bi-files me-1"></i>
+                    Selected Files
+                  </label>
+                  <button type="button" class="btn btn-sm btn-outline-danger" id="clearFilesBtn" title="Remove all files">
+                    <i class="bi bi-x-circle"></i>
+                    Clear All
+                  </button>
+                </div>
+                <div class="border rounded bg-white" style="max-height: 250px; overflow-y: auto;">
+                  <div id="filePreviewList" class="list-group list-group-flush"></div>
+                </div>
+                <div class="d-flex gap-2 mt-2 align-items-center">
+                  <span id="fileCountBadge" class="badge text-bg-primary">0 files</span>
+                  <span id="totalSizeBadge" class="badge text-bg-secondary">0 MB</span>
+                  <span class="text-muted small flex-grow-1 text-end" id="fileWarning"></span>
+                </div>
               </div>
 
               <div class="form-check mb-3">
-                <input class="form-check-input" type="checkbox" id="bulkMode">
-                <label class="form-check-label" for="bulkMode">Bulk upload mode (process multiple files)</label>
-                <div class="form-text">When enabled, uploads multiple files in one request. Max 100 files.</div>
+                <input class="form-check-input" type="checkbox" id="bulkMode" checked>
+                <label class="form-check-label" for="bulkMode">
+                  <strong>Bulk upload mode</strong>
+                </label>
+                <div class="form-text">Process multiple files in one request (max 100 files). Recommended for better efficiency.</div>
               </div>
 
               <div class="form-check mb-3">
                 <input class="form-check-input" type="checkbox" id="syncMode">
                 <label class="form-check-label" for="syncMode">Run synchronously (demo/testing)</label>
-                <div class="form-text">Default is async (Celery). Sync provides immediate results. Requirements work in both modes.</div>
+                <div class="form-text">Default is async with Celery. Sync provides immediate results but may timeout for large files.</div>
               </div>
 
               <div class="mb-3">
@@ -166,7 +198,10 @@
                 </button>
                 <div class="collapse mt-2" id="requirementsCollapse">
                   <div class="card card-body bg-light">
-                    <small class="text-muted mb-2 d-block">Only candidates meeting these requirements will be kept. Others will be discarded.</small>
+                    <small class="text-muted mb-2 d-block">
+                      <i class="bi bi-filter-circle me-1"></i>
+                      Only candidates meeting these requirements will be kept. Others will be discarded.
+                    </small>
                     <div class="mb-2">
                       <label class="form-label small">Required Skills (comma-separated)</label>
                       <input type="text" class="form-control form-control-sm" id="requiredSkills" placeholder="e.g., Python, JavaScript, React">
@@ -205,48 +240,85 @@
                     <div class="form-check">
                       <input class="form-check-input" type="checkbox" id="useLlmValidation" checked>
                       <label class="form-check-label small" for="useLlmValidation">
-                        <strong>Use LLM Validation</strong> (Recommended)
+                        <strong>Use AI Validation</strong> (Recommended)
                       </label>
-                      <div class="form-text small">Uses AI for semantic matching (e.g., "Software Developer" matches "Software Engineer"). Disable for faster but less accurate string matching.</div>
+                      <div class="form-text small">Uses AI for semantic matching (e.g., "Software Developer" matches "Software Engineer"). Disable for faster string matching.</div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <button class="btn btn-dark" type="submit" id="uploadBtn">
-                <i class="bi bi-upload me-2"></i>Upload and Parse
-              </button>
+              <div class="d-flex gap-2">
+                <button class="btn btn-dark flex-grow-1" type="submit" id="uploadBtn">
+                  <i class="bi bi-upload me-2"></i>
+                  <span id="uploadBtnText">Upload and Parse</span>
+                </button>
+              </div>
             </form>
           `)}
         </div>
 
         <div class="col-12 col-xl-6">
-          ${card("Processing Status", `
-            <div class="small text-muted mb-2">This panel updates as the parse run progresses.</div>
-
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <span class="text-muted">Parse Run ID:</span>
-              <span class="fw-semibold" id="runId">—</span>
+          ${card("Upload Progress", `
+            <div class="small text-muted mb-3">
+              <i class="bi bi-clock-history me-1"></i>
+              This panel updates in real-time as files are processed.
             </div>
 
-            <div class="d-flex align-items-center gap-2 mb-3">
-              <span class="text-muted">Status:</span>
-              <span class="badge text-bg-secondary" id="runStatus">—</span>
+            <!-- Overall Upload Progress -->
+            <div class="mb-3 d-none" id="uploadProgressSection">
+              <label class="form-label small fw-semibold">Overall Progress</label>
+              <div class="progress mb-2" style="height: 24px;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                     id="overallProgressBar" 
+                     role="progressbar" 
+                     style="width: 0%">
+                  <span id="overallProgressText">0%</span>
+                </div>
+              </div>
+              <div class="small text-muted" id="uploadStatusText">Uploading...</div>
             </div>
 
-            <div class="progress mb-3 d-none" id="runProgressWrap">
-              <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+            <!-- Single File Parse Status -->
+            <div id="singleFileStatus">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="text-muted small">Parse Run ID:</span>
+                <span class="fw-semibold" id="runId">—</span>
+              </div>
+
+              <div class="d-flex align-items-center gap-2 mb-3">
+                <span class="text-muted small">Status:</span>
+                <span class="badge text-bg-secondary" id="runStatus">—</span>
+              </div>
+
+              <div class="progress mb-3 d-none" id="runProgressWrap">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+              </div>
+
+              <div class="d-flex gap-2 mb-3">
+                <a class="btn btn-outline-dark btn-sm disabled" href="#" id="openRunBtn">
+                  <i class="bi bi-file-text me-1"></i>Open Parse Run
+                </a>
+                <a class="btn btn-dark btn-sm disabled" href="#" id="openCandidateBtn">
+                  <i class="bi bi-person me-1"></i>Open Candidate
+                </a>
+              </div>
             </div>
 
-            <div class="d-flex gap-2">
-              <a class="btn btn-outline-dark btn-sm disabled" href="#" id="openRunBtn">Open Parse Run</a>
-              <a class="btn btn-dark btn-sm disabled" href="#" id="openCandidateBtn">Open Candidate</a>
+            <!-- Bulk Upload Results -->
+            <div class="d-none" id="bulkResultsSection">
+              <div class="mb-3">
+                <label class="form-label small fw-semibold">Upload Summary</label>
+                <div class="d-flex gap-2" id="bulkSummaryBadges"></div>
+              </div>
+              <div id="bulkResultsDetails"></div>
             </div>
 
             <hr class="my-3">
-            <ul class="small mb-0">
-              <li>Duplicate detection links to existing results.</li>
-              <li>For async runs, the page polls parse-run status automatically.</li>
+            <ul class="small mb-0 text-muted">
+              <li>Duplicate files are automatically detected and linked to existing candidates</li>
+              <li>Processing runs in the background - check Parse Runs page for all results</li>
+              <li>You'll receive status updates as files complete</li>
             </ul>
           `)}
         </div>
@@ -337,9 +409,121 @@
       ParsePro.toast("Upload", "Polling timed out. Open the parse run to refresh.", "warning");
     }
 
-    // Enable multiple file selection
+    // File management state
+    let selectedFiles = [];
     const fileInput = $("fileInput");
-    fileInput.setAttribute("multiple", "multiple");
+    
+    // Helper function to format file size
+    function formatFileSize(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+    }
+    
+    // Helper function to get file icon based on extension
+    function getFileIcon(filename) {
+      const ext = filename.split('.').pop().toLowerCase();
+      if (ext === 'pdf') return 'bi-file-earmark-pdf-fill text-danger';
+      if (ext === 'docx' || ext === 'doc') return 'bi-file-earmark-word-fill text-primary';
+      if (ext === 'txt') return 'bi-file-earmark-text-fill text-secondary';
+      return 'bi-file-earmark text-secondary';
+    }
+    
+    // Update file preview list
+    function updateFilePreview(files) {
+      selectedFiles = Array.from(files);
+      const previewSection = $("filePreviewSection");
+      const previewList = $("filePreviewList");
+      const countBadge = $("fileCountBadge");
+      const sizeBadge = $("totalSizeBadge");
+      const fileWarning = $("fileWarning");
+      
+      if (selectedFiles.length === 0) {
+        previewSection.classList.add("d-none");
+        return;
+      }
+      
+      previewSection.classList.remove("d-none");
+      
+      // Calculate total size
+      const totalSize = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+      const totalSizeMB = totalSize / (1024 * 1024);
+      
+      // Update badges
+      countBadge.textContent = `${selectedFiles.length} file${selectedFiles.length !== 1 ? 's' : ''}`;
+      countBadge.className = selectedFiles.length > 100 ? 'badge text-bg-danger' : 'badge text-bg-primary';
+      sizeBadge.textContent = formatFileSize(totalSize);
+      
+      // Show warning if too many files
+      if (selectedFiles.length > 100) {
+        fileWarning.innerHTML = '<i class="bi bi-exclamation-triangle-fill text-danger me-1"></i>Maximum 100 files allowed';
+      } else if (totalSizeMB > 100) {
+        fileWarning.innerHTML = '<i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>Large upload - may take some time';
+      } else {
+        fileWarning.textContent = '';
+      }
+      
+      // Build file list HTML
+      let html = '';
+      selectedFiles.forEach((file, index) => {
+        const sizeStr = formatFileSize(file.size);
+        const isLarge = file.size > 10 * 1024 * 1024; // >10MB
+        const icon = getFileIcon(file.name);
+        
+        html += `
+          <div class="list-group-item d-flex align-items-center gap-2 py-2" data-file-index="${index}">
+            <i class="bi ${icon} fs-5"></i>
+            <div class="flex-grow-1 min-w-0">
+              <div class="fw-semibold text-truncate small">${esc(file.name)}</div>
+              <div class="text-muted" style="font-size: 0.75rem;">
+                ${sizeStr}
+                ${isLarge ? '<span class="text-danger ms-1"><i class="bi bi-exclamation-circle"></i> Too large</span>' : ''}
+              </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-danger remove-file-btn" data-file-index="${index}" title="Remove this file">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+        `;
+      });
+      
+      previewList.innerHTML = html;
+      
+      // Add remove button handlers
+      previewList.querySelectorAll('.remove-file-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const index = parseInt(btn.dataset.fileIndex);
+          removeFile(index);
+        });
+      });
+    }
+    
+    // Remove a file from the selection
+    function removeFile(index) {
+      selectedFiles.splice(index, 1);
+      
+      // Update the file input (we need to create a new FileList)
+      const dt = new DataTransfer();
+      selectedFiles.forEach(file => dt.items.add(file));
+      fileInput.files = dt.files;
+      
+      updateFilePreview(selectedFiles);
+    }
+    
+    // Clear all files
+    $("clearFilesBtn").addEventListener("click", () => {
+      selectedFiles = [];
+      fileInput.value = '';
+      updateFilePreview([]);
+    });
+    
+    // File input change handler
+    fileInput.addEventListener("change", (e) => {
+      updateFilePreview(e.target.files);
+    });
 
     $("uploadForm").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -356,16 +540,42 @@
 
       // Validate file selection
       if (!files || files.length === 0) {
-        ParsePro.renderAlert(alert, "Please select at least one file.", "danger");
+        ParsePro.renderAlert(alert, "Please select at least one resume file to upload.", "danger");
         btn.disabled = false;
         return;
       }
 
       if (bulkMode && files.length > 100) {
-        ParsePro.renderAlert(alert, "Maximum 100 files allowed for bulk upload.", "danger");
+        ParsePro.renderAlert(alert, `You've selected ${files.length} files, but the maximum is 100. Please remove some files or split your upload.`, "danger");
         btn.disabled = false;
         return;
       }
+      
+      // Check for files that are too large (>10MB)
+      const oversizedFiles = selectedFiles.filter(f => f.size > 10 * 1024 * 1024);
+      if (oversizedFiles.length > 0) {
+        const names = oversizedFiles.slice(0, 3).map(f => f.name).join(', ');
+        const suffix = oversizedFiles.length > 3 ? ` and ${oversizedFiles.length - 3} more` : '';
+        ParsePro.renderAlert(alert, `${oversizedFiles.length} file(s) exceed 10MB: ${names}${suffix}. Please remove them or compress the files.`, "danger");
+        btn.disabled = false;
+        return;
+      }
+      
+      // Show upload progress UI
+      const progressSection = $("uploadProgressSection");
+      const progressBar = $("overallProgressBar");
+      const progressText = $("overallProgressText");
+      const uploadStatusText = $("uploadStatusText");
+      const uploadBtnText = $("uploadBtnText");
+      
+      progressSection.classList.remove("d-none");
+      progressBar.style.width = "10%";
+      progressText.textContent = "10%";
+      uploadStatusText.innerHTML = `<i class="bi bi-cloud-upload me-1"></i>Uploading ${files.length} file${files.length !== 1 ? 's' : ''}...`;
+      uploadBtnText.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Uploading...';
+      
+      // Hide single file status during upload
+      $("singleFileStatus").classList.add("d-none");
 
       // For bulk upload, append all files to FormData
       if (bulkMode && files.length > 1) {
@@ -431,72 +641,172 @@
           ? `/resumes/bulk-upload/${sync ? "?sync=1" : ""}`
           : `/resumes/upload/${sync ? "?sync=1" : ""}`;
         
+        // Update progress to 30% (uploading)
+        progressBar.style.width = "30%";
+        progressText.textContent = "30%";
+        
         const resp = await ParsePro.apiFetch(endpoint, { method: "POST", body: fd });
+        
+        // Update progress to 60% (processing)
+        progressBar.style.width = "60%";
+        progressText.textContent = "60%";
+        uploadStatusText.innerHTML = '<i class="bi bi-cpu me-1"></i>Processing files...';
+        
         const data = await resp.json().catch(() => null);
 
         if (!resp.ok || !data?.success) {
-          ParsePro.renderAlert(alert, data?.error?.message || "Upload failed", "danger");
+          progressSection.classList.add("d-none");
+          const errorMsg = data?.error?.message || "Upload failed. Please check your files and try again.";
+          ParsePro.renderAlert(alert, errorMsg, "danger");
+          uploadBtnText.textContent = "Upload and Parse";
           return;
         }
+        
+        // Complete progress
+        progressBar.style.width = "100%";
+        progressText.textContent = "100%";
+        progressBar.classList.remove("progress-bar-animated");
+        uploadStatusText.innerHTML = '<i class="bi bi-check-circle-fill text-success me-1"></i>Upload complete!';
 
         const payload = data.data || {};
+        const userMessage = data.message || '';
 
         // Handle bulk upload response
         if (bulkMode && files.length > 1) {
           const summary = payload;
           const acceptedCount = summary.accepted?.length || summary.matching || 0;
-          const rejectedCount = summary.rejected?.length || summary.discarded || 0;
+          const rejectedCount = summary.rejected?.length || summary.rejected || 0;
           const errorCount = summary.errors?.length || 0;
           const total = summary.total || files.length;
 
-          let message = `Bulk upload completed: ${acceptedCount} accepted, ${rejectedCount} rejected`;
+          // Show bulk results section
+          $("singleFileStatus").classList.add("d-none");
+          $("bulkResultsSection").classList.remove("d-none");
+          
+          // Update summary badges
+          const summaryBadges = $("bulkSummaryBadges");
+          summaryBadges.innerHTML = `
+            <span class="badge text-bg-primary">${total} Total</span>
+            <span class="badge text-bg-success">${acceptedCount} Accepted</span>
+            ${rejectedCount > 0 ? `<span class="badge text-bg-danger">${rejectedCount} Rejected</span>` : ''}
+            ${errorCount > 0 ? `<span class="badge text-bg-warning">${errorCount} Errors</span>` : ''}
+          `;
+
+          let alertMessage = userMessage || `Upload completed: ${acceptedCount} candidates ready to review`;
+          if (rejectedCount > 0) {
+            alertMessage += `, ${rejectedCount} didn't match criteria`;
+          }
           if (errorCount > 0) {
-            message += `, ${errorCount} errors`;
+            alertMessage += `, ${errorCount} failed to process`;
           }
 
-          ParsePro.renderAlert(alert, message, errorCount > 0 ? "warning" : "success");
+          ParsePro.renderAlert(alert, alertMessage, errorCount > 0 ? "warning" : "success");
 
+          // Build detailed results display
+          const resultsDetails = $("bulkResultsDetails");
+          let resultsHtml = '';
+          
+          // Accepted candidates
+          if (summary.accepted && summary.accepted.length > 0) {
+            resultsHtml += `
+              <div class="mb-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <i class="bi bi-check-circle-fill text-success"></i>
+                  <strong class="text-success">Accepted Candidates (${summary.accepted.length})</strong>
+                </div>
+                <div class="list-group list-group-flush border rounded">
+            `;
+            summary.accepted.forEach(r => {
+              const isDuplicate = r.duplicate ? '<span class="badge text-bg-secondary ms-2">Duplicate</span>' : '';
+              const candidateLink = r.candidate_id 
+                ? `<a href="/candidates/${r.candidate_id}/" class="btn btn-sm btn-outline-dark" target="_blank"><i class="bi bi-box-arrow-up-right me-1"></i>View</a>`
+                : '<span class="text-muted small">Processing...</span>';
+              
+              resultsHtml += `
+                <div class="list-group-item d-flex align-items-center gap-2">
+                  <i class="bi ${getFileIcon(r.filename)} fs-5"></i>
+                  <div class="flex-grow-1 min-w-0">
+                    <div class="fw-semibold small text-truncate">${esc(r.filename)}</div>
+                    <div class="text-muted" style="font-size: 0.7rem;">
+                      ${r.status ? badge(r.status) : ''}
+                      ${isDuplicate}
+                    </div>
+                  </div>
+                  ${candidateLink}
+                </div>
+              `;
+            });
+            resultsHtml += `</div></div>`;
+          }
+          
+          // Rejected candidates
+          if (summary.rejected && summary.rejected.length > 0) {
+            resultsHtml += `
+              <div class="mb-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <i class="bi bi-x-circle-fill text-danger"></i>
+                  <strong class="text-danger">Rejected Candidates (${summary.rejected.length})</strong>
+                </div>
+                <div class="list-group list-group-flush border rounded">
+            `;
+            summary.rejected.forEach(r => {
+              const reasons = Array.isArray(r.discard_reasons) ? r.discard_reasons.join("; ") : "Does not meet requirements";
+              resultsHtml += `
+                <div class="list-group-item">
+                  <div class="d-flex align-items-start gap-2">
+                    <i class="bi ${getFileIcon(r.filename)} fs-5 text-danger"></i>
+                    <div class="flex-grow-1 min-w-0">
+                      <div class="fw-semibold small text-truncate">${esc(r.filename)}</div>
+                      <div class="text-danger small mt-1">${esc(reasons)}</div>
+                    </div>
+                  </div>
+                </div>
+              `;
+            });
+            resultsHtml += `</div></div>`;
+          }
+          
+          // Errors
+          if (summary.errors && summary.errors.length > 0) {
+            resultsHtml += `
+              <div class="mb-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+                  <strong class="text-warning">Processing Errors (${summary.errors.length})</strong>
+                </div>
+                <div class="list-group list-group-flush border rounded">
+            `;
+            summary.errors.forEach(e => {
+              resultsHtml += `
+                <div class="list-group-item">
+                  <div class="d-flex align-items-start gap-2">
+                    <i class="bi ${getFileIcon(e.filename)} fs-5 text-warning"></i>
+                    <div class="flex-grow-1 min-w-0">
+                      <div class="fw-semibold small text-truncate">${esc(e.filename)}</div>
+                      <div class="text-warning small mt-1">${esc(e.error)}</div>
+                    </div>
+                  </div>
+                </div>
+              `;
+            });
+            resultsHtml += `</div></div>`;
+          }
+          
+          resultsDetails.innerHTML = resultsHtml;
+          
           // Show requirements info if applied
           if (summary.requirements_applied) {
-            alert.innerHTML += `<div class="mt-2 small text-info"><strong>Requirements applied:</strong> ${JSON.stringify(summary.requirements_applied)}</div>`;
-          }
-
-          // Show detailed breakdown of accepted vs rejected
-          if (summary.results && summary.results.length > 0) {
-            let resultsHtml = `<div class="mt-3"><strong>Detailed Results:</strong></div>`;
-            
-            // Accepted candidates
-            if (summary.accepted && summary.accepted.length > 0) {
-              resultsHtml += `<div class="mt-2"><strong class="text-success">✓ Accepted (${summary.accepted.length}):</strong><ul class="small mb-0 mt-1">`;
-              summary.accepted.forEach(r => {
-                const candidateLink = r.candidate_id 
-                  ? ` <a href="/candidates/${r.candidate_id}/" target="_blank">View Candidate</a>`
-                  : "";
-                resultsHtml += `<li class="text-success">${r.filename}${candidateLink}</li>`;
-              });
-              resultsHtml += `</ul></div>`;
+            const reqKeys = Object.keys(summary.requirements_applied).filter(k => k !== 'use_llm_validation');
+            if (reqKeys.length > 0) {
+              alert.innerHTML += `
+                <div class="mt-2 p-2 bg-info bg-opacity-10 border border-info rounded">
+                  <div class="small">
+                    <i class="bi bi-filter-circle me-1"></i>
+                    <strong>Filters applied:</strong> ${reqKeys.join(', ').replace(/_/g, ' ')}
+                  </div>
+                </div>
+              `;
             }
-            
-            // Rejected candidates
-            if (summary.rejected && summary.rejected.length > 0) {
-              resultsHtml += `<div class="mt-2"><strong class="text-danger">✗ Rejected (${summary.rejected.length}):</strong><ul class="small mb-0 mt-1">`;
-              summary.rejected.forEach(r => {
-                const reasons = r.discard_reasons?.join("; ") || "Does not meet requirements";
-                resultsHtml += `<li class="text-danger">${r.filename} - ${reasons}</li>`;
-              });
-              resultsHtml += `</ul></div>`;
-            }
-            
-            // Errors
-            if (summary.errors && summary.errors.length > 0) {
-              resultsHtml += `<div class="mt-2"><strong class="text-warning">⚠ Errors (${summary.errors.length}):</strong><ul class="small mb-0 mt-1">`;
-              summary.errors.forEach(e => {
-                resultsHtml += `<li class="text-warning">${e.filename} - ${e.error}</li>`;
-              });
-              resultsHtml += `</ul></div>`;
-            }
-            
-            alert.innerHTML += resultsHtml;
           }
 
           // If only one file was successfully uploaded, show its status
@@ -513,45 +823,62 @@
         }
 
         // Handle single file upload response
+        $("singleFileStatus").classList.remove("d-none");
+        $("bulkResultsSection").classList.add("d-none");
+        
         if (payload.duplicate) {
+          // Complete progress
+          setTimeout(() => progressSection.classList.add("d-none"), 2000);
+          
           // Check if duplicate was rejected due to requirements
           if (payload.requirements_check === "failed" && payload.rejection_reasons) {
-            ParsePro.renderAlert(alert, `Duplicate detected but rejected: ${payload.rejection_reasons.join(", ")}`, "danger");
+            const reasons = Array.isArray(payload.rejection_reasons) 
+              ? payload.rejection_reasons.join(", ") 
+              : payload.rejection_reasons;
+            ParsePro.renderAlert(alert, `This resume was already uploaded, but it doesn't meet your current filters: ${reasons}`, "danger");
+            uploadBtnText.textContent = "Upload and Parse";
             return;
           }
-          ParsePro.renderAlert(alert, "Duplicate detected. Redirecting to existing results.", "warning");
-          if (payload.parse_run_id) window.location.href = `/resumes/parse-runs/${payload.parse_run_id}/`;
+          
+          ParsePro.renderAlert(alert, userMessage || "This resume was already uploaded. Showing the existing candidate profile.", "info");
+          setRunPanel(payload.parse_run_id, payload.status, payload.candidate_id || null);
+          uploadBtnText.textContent = "Upload and Parse";
+          setTimeout(() => progressSection.classList.add("d-none"), 2000);
           return;
         }
 
         // Check if candidate was rejected due to requirements
         if (payload.rejected && payload.rejection_reasons) {
-          ParsePro.renderAlert(alert, `Candidate rejected: ${payload.rejection_reasons.join(", ")}`, "danger");
-          if (payload.requirements_applied) {
-            alert.innerHTML += `<div class="mt-2 small text-info"><strong>Requirements applied:</strong> ${JSON.stringify(payload.requirements_applied)}</div>`;
-          }
+          const reasons = Array.isArray(payload.rejection_reasons) 
+            ? payload.rejection_reasons.join(", ") 
+            : payload.rejection_reasons;
+          ParsePro.renderAlert(alert, `This candidate doesn't match your filters: ${reasons}`, "warning");
+          setRunPanel(payload.parse_run_id, payload.status, null);
+          uploadBtnText.textContent = "Upload and Parse";
+          setTimeout(() => progressSection.classList.add("d-none"), 2000);
           return;
         }
 
         // Show requirements info if applied and accepted
         if (payload.requirements_applied && payload.accepted) {
-          ParsePro.renderAlert(alert, "Candidate accepted and meets all requirements!", "success");
-          alert.innerHTML += `<div class="mt-2 small text-info"><strong>Requirements applied:</strong> ${JSON.stringify(payload.requirements_applied)}</div>`;
+          ParsePro.renderAlert(alert, userMessage || "Resume uploaded! This candidate meets all your requirements and is being processed.", "success");
+        } else {
+          ParsePro.renderAlert(alert, userMessage || "Resume uploaded successfully! Processing has started.", "success");
         }
 
         setRunPanel(payload.parse_run_id, payload.status, payload.candidate_id || null);
 
         if (resp.status === 202 || ["queued", "processing"].includes(payload.status)) {
-          const reqMsg = payload.requirements_applied 
-            ? " Upload accepted. Requirements will be checked after processing completes."
-            : " Upload accepted. Parsing queued in background.";
-          ParsePro.renderAlert(alert, reqMsg, "success");
           await poll(payload.parse_run_id);
         } else {
-          ParsePro.renderAlert(alert, `Parsing finished with status: ${payload.status}`, payload.status === "success" ? "success" : "warning");
+          uploadBtnText.textContent = "Upload and Parse";
+          setTimeout(() => progressSection.classList.add("d-none"), 2000);
         }
       } catch (err) {
-        ParsePro.renderAlert(alert, err.message || "Upload failed", "danger");
+        progressSection.classList.add("d-none");
+        const errorMsg = err.message || "Upload failed. Please check your connection and try again.";
+        ParsePro.renderAlert(alert, errorMsg, "danger");
+        uploadBtnText.textContent = "Upload and Parse";
       } finally {
         btn.disabled = false;
       }
