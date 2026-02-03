@@ -462,11 +462,14 @@ class ResumeDocumentViewSet(viewsets.ModelViewSet):
             "candidates_deleted": candidates_count,
         })
         
-        return ok({
-            "message": f"Document '{filename}' deleted successfully",
-            "parse_runs_deleted": parse_runs_count,
-            "candidates_deleted": candidates_count,
-        })
+        return ok(
+            {
+                "deleted_document": filename,
+                "parse_runs_deleted": parse_runs_count,
+                "candidates_deleted": candidates_count,
+            },
+            message=f"'{filename}' and all related data have been permanently deleted."
+        )
 
 
 class ParseRunViewSet(viewsets.ModelViewSet):
@@ -487,6 +490,7 @@ class ParseRunViewSet(viewsets.ModelViewSet):
         """Delete a parse run and its associated candidate (if any)."""
         instance = self.get_object()
         run_id = instance.id
+        filename = instance.resume_document.original_filename if instance.resume_document else "Unknown"
         
         # Also delete associated candidate if exists
         from candidates.models import Candidate
@@ -495,18 +499,32 @@ class ParseRunViewSet(viewsets.ModelViewSet):
         instance.delete()
         logger.info(f"ParseRun {run_id} deleted by user {request.user.id}")
         
-        return ok({
-            "message": f"Parse run #{run_id} deleted successfully",
-            "deleted_candidate": deleted_candidate > 0
-        })
+        return ok(
+            {
+                "deleted_parse_run": run_id,
+                "deleted_candidate": deleted_candidate > 0,
+            },
+            message=f"Parse run for '{filename}' has been deleted." + (
+                " The associated candidate profile was also removed." if deleted_candidate > 0 else ""
+            )
+        )
 
     @action(detail=True, methods=["post"])
     def retry(self, request, pk=None):
+        """
+        Retry parsing a resume that previously failed or had issues.
+        Creates a new parse run with the latest model settings.
+        """
         run = self.get_object()
         doc = run.resume_document
 
         if not doc.raw_text:
-            return fail("No raw_text available for retry.", code="NO_RAW_TEXT", status=400)
+            return fail(
+                "No text content available",
+                code="NO_RAW_TEXT",
+                status=400,
+                user_message="This resume doesn't have any extractable text. Please upload a different file or check if the original file was valid."
+            )
 
         new_run = ParseRun.objects.create(
             resume_document=doc,
@@ -520,12 +538,27 @@ class ParseRunViewSet(viewsets.ModelViewSet):
         sync = request.query_params.get("sync") == "1"
         if getattr(settings, "RESUME_PARSE_ASYNC", True) and not sync:
             parse_resume_parse_run.delay(new_run.id)
-            return ok({"parse_run_id": new_run.id, "status": "queued"}, status=202)
+            return ok(
+                {"parse_run_id": new_run.id, "status": "queued"},
+                status=202,
+                message="Resume is being reprocessed. Check back shortly for the results."
+            )
 
         # synchronous fallback
         parse_resume_parse_run(new_run.id)
         new_run.refresh_from_db()
-        return ok(ParseRunSerializer(new_run).data, status=201)
+        
+        status_messages = {
+            'success': "Resume successfully reprocessed! The candidate profile has been updated.",
+            'partial': "Resume reprocessed with some missing information. Please review the results.",
+            'failed': "Unfortunately, we couldn't process this resume. Please try a different file format.",
+        }
+        
+        return ok(
+            ParseRunSerializer(new_run).data,
+            status=201,
+            message=status_messages.get(new_run.status, "Resume processing complete.")
+        )
 
 
 class ResumeUploadViewSet(viewsets.ViewSet):
@@ -547,7 +580,12 @@ class ResumeUploadViewSet(viewsets.ViewSet):
             try:
                 requirements_json = json.loads(requirements_json)
             except json.JSONDecodeError:
-                return fail("Invalid JSON in requirements field.", code="INVALID_REQUIREMENTS", status=400)
+                return fail(
+                    "Invalid JSON in requirements",
+                    code="INVALID_REQUIREMENTS",
+                    status=400,
+                    user_message="The filter criteria you provided isn't valid JSON. Please check the format and try again."
+                )
         
         # Validate requirements if provided
         requirements = None
@@ -557,7 +595,15 @@ class ResumeUploadViewSet(viewsets.ViewSet):
             if temp_ser.is_valid():
                 requirements = temp_ser.validated_data.get("requirements")
             else:
-                return fail(f"Invalid requirements: {temp_ser.errors}", code="INVALID_REQUIREMENTS", status=400)
+                # Extract user-friendly error message
+                req_errors = temp_ser.errors.get("requirements", [])
+                error_msg = req_errors[0] if req_errors else "Invalid filter criteria"
+                return fail(
+                    f"Invalid requirements: {temp_ser.errors}",
+                    code="INVALID_REQUIREMENTS",
+                    status=400,
+                    user_message=str(error_msg)
+                )
 
         # (2) Idempotency: compute hash and check duplicates per user
         file_hash = sha256_of_uploaded_file(f)
@@ -650,7 +696,12 @@ class ResumeUploadViewSet(viewsets.ViewSet):
                 "error_code": e.error_code,
                 "error": str(e),
             })
-            return fail(str(e), code=e.error_code, status=400)
+            return fail(
+                str(e),
+                code=e.error_code,
+                status=400
+                # User-friendly message will be auto-applied from ERROR_MESSAGES in core/responses.py
+            )
         except Exception as e:
             doc.raw_text = ""
             doc.extraction_method = "failed"
@@ -659,7 +710,12 @@ class ResumeUploadViewSet(viewsets.ViewSet):
                 "document_id": doc.id,
                 "error": str(e),
             })
-            return fail(f"Text extraction failed: {str(e)}", code="TEXT_EXTRACTION_FAILED", status=400)
+            return fail(
+                f"Text extraction failed: {str(e)}",
+                code="TEXT_EXTRACTION_FAILED",
+                status=400,
+                user_message="We couldn't read the content from this file. Please make sure it's a valid resume document and try again."
+            )
 
         # Create ParseRun queued and dispatch (7)
         run = ParseRun.objects.create(
@@ -673,7 +729,11 @@ class ResumeUploadViewSet(viewsets.ViewSet):
         sync = request.query_params.get("sync") == "1"
         if getattr(settings, "RESUME_PARSE_ASYNC", True) and not sync:
             parse_resume_parse_run.delay(run.id)
-            return ok({"resume_document_id": doc.id, "parse_run_id": run.id, "status": "queued"}, status=202)
+            return ok(
+                {"resume_document_id": doc.id, "parse_run_id": run.id, "status": "queued"},
+                status=202,
+                message="Resume uploaded successfully! Processing has started and will complete shortly."
+            )
 
         # sync fallback for demos/testing
         parse_resume_parse_run(run.id)
@@ -718,10 +778,20 @@ class ResumeUploadViewSet(viewsets.ViewSet):
         files = request.FILES.getlist("files") or request.FILES.getlist("file")
         
         if not files:
-            return fail("No files provided. Use 'files' field for multiple files.", code="NO_FILES", status=400)
+            return fail(
+                "No files provided",
+                code="NO_FILES",
+                status=400,
+                user_message="Please select at least one resume file to upload."
+            )
         
         if len(files) > 100:
-            return fail("Maximum 100 files allowed per bulk upload.", code="TOO_MANY_FILES", status=400)
+            return fail(
+                "Too many files",
+                code="TOO_MANY_FILES",
+                status=400,
+                user_message=f"You've selected {len(files)} files, but the maximum is 100. Please split your upload into smaller batches."
+            )
 
         # Get requirements from request data (JSON field)
         requirements_json = request.data.get("requirements")
@@ -730,7 +800,12 @@ class ResumeUploadViewSet(viewsets.ViewSet):
             try:
                 requirements_json = json.loads(requirements_json)
             except json.JSONDecodeError:
-                return fail("Invalid JSON in requirements field.", code="INVALID_REQUIREMENTS", status=400)
+                return fail(
+                    "Invalid JSON in requirements",
+                    code="INVALID_REQUIREMENTS",
+                    status=400,
+                    user_message="The filter criteria format is invalid. Please use valid JSON format."
+                )
 
         ser = BulkResumeUploadSerializer(data={"files": files, "requirements": requirements_json})
         ser.is_valid(raise_exception=True)
