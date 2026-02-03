@@ -209,10 +209,11 @@ OPENROUTER_SUMMARY_TEMPERATURE = float(os.getenv('OPENROUTER_SUMMARY_TEMPERATURE
 # Fallback models for rate limit resilience (free tier)
 # When primary model is rate-limited (429), try these in order
 # See: https://openrouter.ai/docs/guides/routing/model-fallbacks
+# IMPORTANT: OpenRouter API limit is 3 models total (primary + fallbacks = 3 max)
+# This means you can only have 2 fallback models!
 OPENROUTER_FALLBACK_MODELS = [
-    'z-ai/glm-4.5-air:free',           # MoE architecture, supports thinking mode
-    'qwen/qwen3-next-80b-a3b-instruct:free',  # 262K context, good for complex tasks
-    'nvidia/nemotron-3-nano-30b-a3b:free',    # Original default
+    'nvidia/nemotron-3-nano-30b-a3b:free',    # Stable fallback
+    'google/gemini-2.0-flash-exp:free',       # Fast alternative
 ]
 
 # Model-specific timeouts (free models may have higher latency)
@@ -248,8 +249,11 @@ CELERY_TIMEZONE = 'UTC'
 # The 'prefork' pool uses fork() which is not available on Windows
 # Install eventlet with: pip install eventlet
 # Fallback to 'solo' if eventlet has issues
-CELERY_WORKER_POOL = os.getenv('CELERY_WORKER_POOL', 'eventlet')
-CELERY_WORKER_CONCURRENCY = int(os.getenv('CELERY_WORKER_CONCURRENCY', '8'))
+#
+# IMPORTANT: Do NOT use CELERY_WORKER_POOL setting!
+# Use the -P flag when starting the worker instead:
+#   celery -A config worker -P eventlet -c 8
+# Setting CELERY_WORKER_POOL here causes warnings because patches aren't applied early enough.
 
 # Task prefetching for better throughput
 CELERY_WORKER_PREFETCH_MULTIPLIER = 2
