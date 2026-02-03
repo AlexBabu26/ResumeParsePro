@@ -189,7 +189,7 @@ def openrouter_call(model: str, system_prompt: str, user_prompt: str, temperatur
     - Cost calculation
     - Structured logging
     """
-    api_key = "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"
+    api_key = settings.OPENROUTER_API_KEY
     if not api_key:
         logger.error("OPENROUTER_API_KEY not configured")
         raise RuntimeError("OPENROUTER_API_KEY not set")

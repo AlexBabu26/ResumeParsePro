@@ -183,8 +183,8 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
 }
 
-# OpenRouter configuration
-OPENROUTER_API_KEY = "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"
+# OpenRouter configuration - API key must be set in .env (never hardcode in source)
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 
 # Extraction model - using Nvidia Nemotron free tier
 # Options: "nvidia/nemotron-3-nano-30b-a3b:free" (free)
