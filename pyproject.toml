@@ -20,6 +20,7 @@ dependencies = [
     "tenacity>=8.2.0",
     "django-filter>=24.0",
     "docx2txt>=0.8",
+    "reportlab>=4.4.9",
 ]
 
 [project.optional-dependencies]

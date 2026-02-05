@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 400" width="900" height="400">
+  <style>
+    text { font-family: Arial, sans-serif; font-size: 14px; }
+    .title { font-size: 24px; font-weight: bold; }
+    .label { font-size: 11px; }
+    .process { font-size: 12px; }
+  </style>
+  
+  <!-- Title -->
+  <text x="450" y="40" text-anchor="middle" class="title">LEVEL 1.1 ADMIN - USER MANAGEMENT</text>
+  
+  <!-- ADMIN Entity (Rectangle) -->
+  <rect x="30" y="170" width="80" height="50" fill="none" stroke="black" stroke-width="2"/>
+  <text x="70" y="200" text-anchor="middle">ADMIN</text>
+  
+  <!-- User Management Process (Main) -->
+  <ellipse cx="220" cy="195" rx="75" ry="35" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="220" y="190" text-anchor="middle" class="process">User</text>
+  <text x="220" y="205" text-anchor="middle" class="process">Management</text>
+  
+  <!-- Arrow from ADMIN to User Management -->
+  <line x1="110" y1="195" x2="145" y2="195" stroke="black" stroke-width="1.5"/>
+  <polygon points="145,195 138,190 138,200" fill="black"/>
+  
+  <!-- Sub-process 1: View Registered Users -->
+  <ellipse cx="450" cy="120" rx="85" ry="30" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="450" y="115" text-anchor="middle" class="process">View Registered</text>
+  <text x="450" y="130" text-anchor="middle" class="process">Users</text>
+  
+  <!-- Sub-process 2: Deactivate User -->
+  <ellipse cx="450" cy="195" rx="85" ry="30" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="450" y="190" text-anchor="middle" class="process">Activate/Deactivate</text>
+  <text x="450" y="205" text-anchor="middle" class="process">User</text>
+  
+  <!-- Sub-process 3: View User Activity -->
+  <ellipse cx="450" cy="270" rx="85" ry="30" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="450" y="265" text-anchor="middle" class="process">View User</text>
+  <text x="450" y="280" text-anchor="middle" class="process">Activity</text>
+  
+  <!-- Arrows from User Management to sub-processes -->
+  <line x1="290" y1="175" x2="365" y2="130" stroke="black" stroke-width="1"/>
+  <polygon points="365,130 357,133 360,142" fill="black"/>
+  
+  <line x1="295" y1="195" x2="365" y2="195" stroke="black" stroke-width="1"/>
+  <polygon points="365,195 358,190 358,200" fill="black"/>
+  
+  <line x1="288" y1="220" x2="365" y2="260" stroke="black" stroke-width="1"/>
+  <polygon points="365,260 358,254 356,264" fill="black"/>
+  
+  <!-- Data Store: users (right-open box) -->
+  <line x1="680" y1="105" x2="780" y2="105" stroke="black" stroke-width="1.5"/>
+  <line x1="680" y1="105" x2="680" y2="135" stroke="black" stroke-width="1.5"/>
+  <line x1="680" y1="135" x2="780" y2="135" stroke="black" stroke-width="1.5"/>
+  <text x="730" y="125" text-anchor="middle" class="label">users</text>
+  
+  <!-- Arrow from View Registered Users to users -->
+  <line x1="535" y1="120" x2="680" y2="120" stroke="black" stroke-width="1.5"/>
+  <polygon points="680,120 673,115 673,125" fill="black"/>
+  
+  <!-- Arrow from Activate/Deactivate to users (bidirectional) -->
+  <line x1="535" y1="185" x2="620" y2="185" stroke="black" stroke-width="1"/>
+  <line x1="620" y1="185" x2="620" y2="125" stroke="black" stroke-width="1"/>
+  <line x1="620" y1="125" x2="680" y2="120" stroke="black" stroke-width="1"/>
+  <polygon points="680,120 673,115 673,125" fill="black"/>
+  <text x="575" y="175" text-anchor="middle" class="label">update_status</text>
+  
+  <!-- Data Store: activity_logs (right-open box) -->
+  <line x1="680" y1="255" x2="800" y2="255" stroke="black" stroke-width="1.5"/>
+  <line x1="680" y1="255" x2="680" y2="285" stroke="black" stroke-width="1.5"/>
+  <line x1="680" y1="285" x2="800" y2="285" stroke="black" stroke-width="1.5"/>
+  <text x="740" y="275" text-anchor="middle" class="label">parse_runs</text>
+  
+  <!-- Arrow from View User Activity to activity_logs -->
+  <line x1="535" y1="270" x2="680" y2="270" stroke="black" stroke-width="1.5"/>
+  <polygon points="680,270 673,265 673,275" fill="black"/>
+</svg>

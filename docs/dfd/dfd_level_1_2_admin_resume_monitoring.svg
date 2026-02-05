@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 450" width="1000" height="450">
+  <style>
+    text { font-family: Arial, sans-serif; font-size: 14px; }
+    .title { font-size: 24px; font-weight: bold; }
+    .label { font-size: 11px; }
+    .process { font-size: 12px; }
+  </style>
+  
+  <!-- Title -->
+  <text x="500" y="40" text-anchor="middle" class="title">LEVEL 1.2 ADMIN - RESUME MONITORING</text>
+  
+  <!-- ADMIN Entity (Rectangle) -->
+  <rect x="30" y="190" width="80" height="50" fill="none" stroke="black" stroke-width="2"/>
+  <text x="70" y="220" text-anchor="middle">ADMIN</text>
+  
+  <!-- Resume Monitoring Process (Main) -->
+  <ellipse cx="220" cy="215" rx="75" ry="35" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="220" y="210" text-anchor="middle" class="process">Resume</text>
+  <text x="220" y="225" text-anchor="middle" class="process">Monitoring</text>
+  
+  <!-- Arrow from ADMIN to Resume Monitoring -->
+  <line x1="110" y1="215" x2="145" y2="215" stroke="black" stroke-width="1.5"/>
+  <polygon points="145,215 138,210 138,220" fill="black"/>
+  
+  <!-- Sub-process 1: View All Documents -->
+  <ellipse cx="450" cy="100" rx="80" ry="28" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="450" y="95" text-anchor="middle" class="process">View All</text>
+  <text x="450" y="110" text-anchor="middle" class="process">Documents</text>
+  
+  <!-- Sub-process 2: Monitor Parse Status -->
+  <ellipse cx="450" cy="180" rx="80" ry="28" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="450" y="175" text-anchor="middle" class="process">Monitor Parse</text>
+  <text x="450" y="190" text-anchor="middle" class="process">Status</text>
+  
+  <!-- Sub-process 3: View Failed Parses -->
+  <ellipse cx="450" cy="260" rx="80" ry="28" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="450" y="255" text-anchor="middle" class="process">View Failed</text>
+  <text x="450" y="270" text-anchor="middle" class="process">Parses</text>
+  
+  <!-- Sub-process 4: Retry Failed Parse -->
+  <ellipse cx="450" cy="340" rx="80" ry="28" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="450" y="335" text-anchor="middle" class="process">Retry Failed</text>
+  <text x="450" y="350" text-anchor="middle" class="process">Parse</text>
+  
+  <!-- Arrows from Resume Monitoring to sub-processes -->
+  <line x1="285" y1="190" x2="370" y2="115" stroke="black" stroke-width="1"/>
+  <polygon points="370,115 362,118 365,127" fill="black"/>
+  
+  <line x1="295" y1="205" x2="370" y2="180" stroke="black" stroke-width="1"/>
+  <polygon points="370,180 362,177 364,187" fill="black"/>
+  
+  <line x1="290" y1="235" x2="370" y2="260" stroke="black" stroke-width="1"/>
+  <polygon points="370,260 363,254 362,264" fill="black"/>
+  
+  <line x1="280" y1="250" x2="370" y2="335" stroke="black" stroke-width="1"/>
+  <polygon points="370,335 364,327 361,336" fill="black"/>
+  
+  <!-- Data Store: resume_documents (right-open box) -->
+  <line x1="680" y1="85" x2="820" y2="85" stroke="black" stroke-width="1.5"/>
+  <line x1="680" y1="85" x2="680" y2="115" stroke="black" stroke-width="1.5"/>
+  <line x1="680" y1="115" x2="820" y2="115" stroke="black" stroke-width="1.5"/>
+  <text x="750" y="105" text-anchor="middle" class="label">resume_documents</text>
+  
+  <!-- Arrow from View All Documents to resume_documents -->
+  <line x1="530" y1="100" x2="680" y2="100" stroke="black" stroke-width="1.5"/>
+  <polygon points="680,100 673,95 673,105" fill="black"/>
+  
+  <!-- Data Store: parse_runs (right-open box) -->
+  <line x1="680" y1="165" x2="790" y2="165" stroke="black" stroke-width="1.5"/>
+  <line x1="680" y1="165" x2="680" y2="195" stroke="black" stroke-width="1.5"/>
+  <line x1="680" y1="195" x2="790" y2="195" stroke="black" stroke-width="1.5"/>
+  <text x="735" y="185" text-anchor="middle" class="label">parse_runs</text>
+  
+  <!-- Arrow from Monitor Parse Status to parse_runs -->
+  <line x1="530" y1="180" x2="680" y2="180" stroke="black" stroke-width="1.5"/>
+  <polygon points="680,180 673,175 673,185" fill="black"/>
+  
+  <!-- Data Store: parse_run_status_logs (right-open box) -->
+  <line x1="680" y1="245" x2="850" y2="245" stroke="black" stroke-width="1.5"/>
+  <line x1="680" y1="245" x2="680" y2="275" stroke="black" stroke-width="1.5"/>
+  <line x1="680" y1="275" x2="850" y2="275" stroke="black" stroke-width="1.5"/>
+  <text x="765" y="265" text-anchor="middle" class="label">parse_run_status_logs</text>
+  
+  <!-- Arrow from View Failed Parses to parse_run_status_logs -->
+  <line x1="530" y1="260" x2="680" y2="260" stroke="black" stroke-width="1.5"/>
+  <polygon points="680,260 673,255 673,265" fill="black"/>
+  
+  <!-- Arrow from Retry Failed Parse to parse_runs -->
+  <line x1="530" y1="340" x2="620" y2="340" stroke="black" stroke-width="1"/>
+  <line x1="620" y1="340" x2="620" y2="195" stroke="black" stroke-width="1"/>
+  <line x1="620" y1="195" x2="680" y2="185" stroke="black" stroke-width="1"/>
+  <polygon points="680,185 673,180 673,190" fill="black"/>
+  <text x="600" y="360" text-anchor="middle" class="label">retry_request</text>
+</svg>

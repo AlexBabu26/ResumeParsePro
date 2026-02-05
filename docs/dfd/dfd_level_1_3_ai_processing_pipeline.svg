@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="1200" height="600">
+  <style>
+    text { font-family: Arial, sans-serif; font-size: 14px; }
+    .title { font-size: 24px; font-weight: bold; }
+    .label { font-size: 10px; }
+    .process { font-size: 11px; }
+  </style>
+  
+  <!-- Title -->
+  <text x="600" y="40" text-anchor="middle" class="title">LEVEL 1.3 AI PROCESSING PIPELINE</text>
+  
+  <!-- Input: Resume Document -->
+  <line x1="30" y1="280" x2="130" y2="280" stroke="black" stroke-width="1.5"/>
+  <line x1="30" y1="280" x2="30" y2="320" stroke="black" stroke-width="1.5"/>
+  <line x1="30" y1="320" x2="130" y2="320" stroke="black" stroke-width="1.5"/>
+  <text x="80" y="305" text-anchor="middle" class="label">resume_documents</text>
+  
+  <!-- Process 1: Text Extraction -->
+  <ellipse cx="230" cy="300" rx="65" ry="30" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="230" y="295" text-anchor="middle" class="process">Text</text>
+  <text x="230" y="310" text-anchor="middle" class="process">Extraction</text>
+  
+  <!-- Arrow from resume_documents to Text Extraction -->
+  <line x1="130" y1="300" x2="165" y2="300" stroke="black" stroke-width="1.5"/>
+  <polygon points="165,300 158,295 158,305" fill="black"/>
+  <text x="147" y="290" text-anchor="middle" class="label">file</text>
+  
+  <!-- Process 2: PII Extraction (Regex) -->
+  <ellipse cx="380" cy="200" rx="65" ry="30" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="380" y="195" text-anchor="middle" class="process">PII Extraction</text>
+  <text x="380" y="210" text-anchor="middle" class="process">(Regex)</text>
+  
+  <!-- Process 3: LLM Data Extraction -->
+  <ellipse cx="380" cy="300" rx="65" ry="30" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="380" y="295" text-anchor="middle" class="process">LLM Data</text>
+  <text x="380" y="310" text-anchor="middle" class="process">Extraction</text>
+  
+  <!-- Arrow from Text Extraction to PII Extraction -->
+  <line x1="290" y1="280" x2="315" y2="220" stroke="black" stroke-width="1"/>
+  <polygon points="315,220 308,227 317,228" fill="black"/>
+  <text x="290" y="240" text-anchor="middle" class="label">raw_text</text>
+  
+  <!-- Arrow from Text Extraction to LLM Data Extraction -->
+  <line x1="295" y1="300" x2="315" y2="300" stroke="black" stroke-width="1"/>
+  <polygon points="315,300 308,295 308,305" fill="black"/>
+  
+  <!-- Process 4: Schema Validation -->
+  <ellipse cx="530" cy="300" rx="60" ry="30" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="530" y="295" text-anchor="middle" class="process">Schema</text>
+  <text x="530" y="310" text-anchor="middle" class="process">Validation</text>
+  
+  <!-- Arrow from LLM Extraction to Schema Validation -->
+  <line x1="445" y1="300" x2="470" y2="300" stroke="black" stroke-width="1"/>
+  <polygon points="470,300 463,295 463,305" fill="black"/>
+  <text x="457" y="290" text-anchor="middle" class="label">llm_json</text>
+  
+  <!-- Arrow from PII Extraction to Schema Validation (known_pii) -->
+  <line x1="445" y1="200" x2="510" y2="200" stroke="black" stroke-width="1"/>
+  <line x1="510" y1="200" x2="510" y2="270" stroke="black" stroke-width="1"/>
+  <polygon points="510,270 505,263 515,263" fill="black"/>
+  <text x="480" y="190" text-anchor="middle" class="label">known_pii</text>
+  
+  <!-- Process 5: Normalization -->
+  <ellipse cx="670" cy="300" rx="60" ry="30" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="670" y="295" text-anchor="middle" class="process">Normalization</text>
+  <text x="670" y="310" text-anchor="middle" class="process">&amp; Anti-Halluc.</text>
+  
+  <!-- Arrow from Schema Validation to Normalization -->
+  <line x1="590" y1="300" x2="610" y2="300" stroke="black" stroke-width="1"/>
+  <polygon points="610,300 603,295 603,305" fill="black"/>
+  
+  <!-- Process 6: Classification (LLM) -->
+  <ellipse cx="820" cy="220" rx="60" ry="30" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="820" y="215" text-anchor="middle" class="process">Classification</text>
+  <text x="820" y="230" text-anchor="middle" class="process">(LLM)</text>
+  
+  <!-- Process 7: Summary Generation (LLM) -->
+  <ellipse cx="820" cy="380" rx="60" ry="30" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="820" y="375" text-anchor="middle" class="process">Summary</text>
+  <text x="820" y="390" text-anchor="middle" class="process">Generation</text>
+  
+  <!-- Arrow from Normalization to Classification -->
+  <line x1="725" y1="280" x2="760" y2="235" stroke="black" stroke-width="1"/>
+  <polygon points="760,235 752,239 757,247" fill="black"/>
+  <text x="730" y="250" text-anchor="middle" class="label">normalized</text>
+  
+  <!-- Arrow from Normalization to Summary Generation -->
+  <line x1="725" y1="320" x2="760" y2="365" stroke="black" stroke-width="1"/>
+  <polygon points="760,365 752,359 756,368" fill="black"/>
+  
+  <!-- Process 8: Store Results -->
+  <ellipse cx="970" cy="300" rx="60" ry="30" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="970" y="295" text-anchor="middle" class="process">Store</text>
+  <text x="970" y="310" text-anchor="middle" class="process">Results</text>
+  
+  <!-- Arrow from Classification to Store Results -->
+  <line x1="875" y1="235" x2="915" y2="280" stroke="black" stroke-width="1"/>
+  <polygon points="915,280 909,272 905,281" fill="black"/>
+  <text x="910" y="250" text-anchor="middle" class="label">role/seniority</text>
+  
+  <!-- Arrow from Summary to Store Results -->
+  <line x1="875" y1="365" x2="915" y2="320" stroke="black" stroke-width="1"/>
+  <polygon points="915,320 908,327 913,335" fill="black"/>
+  <text x="910" y="355" text-anchor="middle" class="label">highlights</text>
+  
+  <!-- Data Store: parse_runs (right-open box) -->
+  <line x1="1050" y1="220" x2="1150" y2="220" stroke="black" stroke-width="1.5"/>
+  <line x1="1050" y1="220" x2="1050" y2="250" stroke="black" stroke-width="1.5"/>
+  <line x1="1050" y1="250" x2="1150" y2="250" stroke="black" stroke-width="1.5"/>
+  <text x="1100" y="240" text-anchor="middle" class="label">parse_runs</text>
+  
+  <!-- Data Store: candidates (right-open box) -->
+  <line x1="1050" y1="285" x2="1150" y2="285" stroke="black" stroke-width="1.5"/>
+  <line x1="1050" y1="285" x2="1050" y2="315" stroke="black" stroke-width="1.5"/>
+  <line x1="1050" y1="315" x2="1150" y2="315" stroke="black" stroke-width="1.5"/>
+  <text x="1100" y="305" text-anchor="middle" class="label">candidates</text>
+  
+  <!-- Data Store: skills (right-open box) -->
+  <line x1="1050" y1="350" x2="1130" y2="350" stroke="black" stroke-width="1.5"/>
+  <line x1="1050" y1="350" x2="1050" y2="380" stroke="black" stroke-width="1.5"/>
+  <line x1="1050" y1="380" x2="1130" y2="380" stroke="black" stroke-width="1.5"/>
+  <text x="1090" y="370" text-anchor="middle" class="label">skills</text>
+  
+  <!-- Arrows from Store Results to data stores -->
+  <line x1="1030" y1="285" x2="1050" y2="235" stroke="black" stroke-width="1"/>
+  <polygon points="1050,235 1043,242 1052,244" fill="black"/>
+  
+  <line x1="1030" y1="300" x2="1050" y2="300" stroke="black" stroke-width="1"/>
+  <polygon points="1050,300 1043,295 1043,305" fill="black"/>
+  
+  <line x1="1030" y1="315" x2="1050" y2="365" stroke="black" stroke-width="1"/>
+  <polygon points="1050,365 1043,358 1051,357" fill="black"/>
+  
+  <!-- OpenRouter API (External System) -->
+  <rect x="350" y="420" width="100" height="50" fill="none" stroke="black" stroke-width="2"/>
+  <text x="400" y="440" text-anchor="middle" class="label">OpenRouter</text>
+  <text x="400" y="455" text-anchor="middle" class="label">LLM API</text>
+  
+  <!-- Arrow from LLM Extraction to OpenRouter -->
+  <line x1="380" y1="330" x2="380" y2="420" stroke="black" stroke-width="1"/>
+  <polygon points="380,420 375,413 385,413" fill="black"/>
+  <text x="400" y="380" text-anchor="middle" class="label">prompt</text>
+  
+  <!-- Arrow from OpenRouter to Classification -->
+  <line x1="450" y1="445" x2="700" y2="445" stroke="black" stroke-width="1"/>
+  <line x1="700" y1="445" x2="700" y2="250" stroke="black" stroke-width="1"/>
+  <line x1="700" y1="250" x2="760" y2="230" stroke="black" stroke-width="1"/>
+  <polygon points="760,230 752,228 754,238" fill="black"/>
+  
+  <!-- Arrow from OpenRouter to Summary -->
+  <line x1="450" y1="460" x2="720" y2="460" stroke="black" stroke-width="1"/>
+  <line x1="720" y1="460" x2="720" y2="395" stroke="black" stroke-width="1"/>
+  <line x1="720" y1="395" x2="760" y2="385" stroke="black" stroke-width="1"/>
+  <polygon points="760,385 752,383 754,393" fill="black"/>
+  
+  <!-- Legend -->
+  <text x="600" y="550" text-anchor="middle" font-size="11" fill="#666">AI Pipeline: Text Extraction � PII Regex � LLM Extraction � Validation � Classification &amp; Summary � Storage</text>
+</svg>

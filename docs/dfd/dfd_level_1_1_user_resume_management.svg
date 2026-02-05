@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 500" width="1100" height="500">
+  <style>
+    text { font-family: Arial, sans-serif; font-size: 14px; }
+    .title { font-size: 24px; font-weight: bold; }
+    .label { font-size: 11px; }
+    .process { font-size: 12px; }
+  </style>
+  
+  <!-- Title -->
+  <text x="550" y="40" text-anchor="middle" class="title">LEVEL 1.1 USER - RESUME MANAGEMENT</text>
+  
+  <!-- USER Entity (Rectangle) -->
+  <rect x="30" y="200" width="80" height="50" fill="none" stroke="black" stroke-width="2"/>
+  <text x="70" y="230" text-anchor="middle">USER</text>
+  
+  <!-- Resume Management Process (Main) -->
+  <ellipse cx="220" cy="225" rx="70" ry="35" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="220" y="220" text-anchor="middle" class="process">Resume</text>
+  <text x="220" y="235" text-anchor="middle" class="process">Management</text>
+  
+  <!-- Arrow from USER to Resume Management -->
+  <line x1="110" y1="225" x2="150" y2="225" stroke="black" stroke-width="1.5"/>
+  <polygon points="150,225 143,220 143,230" fill="black"/>
+  
+  <!-- Sub-process 1: Upload File -->
+  <ellipse cx="420" cy="100" rx="60" ry="25" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="420" y="105" text-anchor="middle" class="process">Upload File</text>
+  
+  <!-- Sub-process 2: Extract Text -->
+  <ellipse cx="420" cy="180" rx="60" ry="25" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="420" y="185" text-anchor="middle" class="process">Extract Text</text>
+  
+  <!-- Sub-process 3: Parse Resume -->
+  <ellipse cx="420" cy="260" rx="60" ry="25" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="420" y="265" text-anchor="middle" class="process">Parse Resume</text>
+  
+  <!-- Sub-process 4: View Status -->
+  <ellipse cx="420" cy="340" rx="60" ry="25" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="420" y="345" text-anchor="middle" class="process">View Status</text>
+  
+  <!-- Sub-process 5: Retry Parse -->
+  <ellipse cx="420" cy="420" rx="60" ry="25" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="420" y="425" text-anchor="middle" class="process">Retry Parse</text>
+  
+  <!-- Arrows from Resume Management to sub-processes -->
+  <line x1="280" y1="200" x2="360" y2="110" stroke="black" stroke-width="1"/>
+  <polygon points="360,110 352,114 356,122" fill="black"/>
+  
+  <line x1="285" y1="210" x2="360" y2="180" stroke="black" stroke-width="1"/>
+  <polygon points="360,180 352,177 353,187" fill="black"/>
+  
+  <line x1="285" y1="240" x2="360" y2="260" stroke="black" stroke-width="1"/>
+  <polygon points="360,260 352,255 352,265" fill="black"/>
+  
+  <line x1="275" y1="255" x2="360" y2="335" stroke="black" stroke-width="1"/>
+  <polygon points="360,335 353,328 350,337" fill="black"/>
+  
+  <line x1="265" y1="260" x2="360" y2="415" stroke="black" stroke-width="1"/>
+  <polygon points="360,415 354,407 350,416" fill="black"/>
+  
+  <!-- Data Store: resume_documents (right-open box) -->
+  <line x1="620" y1="85" x2="760" y2="85" stroke="black" stroke-width="1.5"/>
+  <line x1="620" y1="85" x2="620" y2="115" stroke="black" stroke-width="1.5"/>
+  <line x1="620" y1="115" x2="760" y2="115" stroke="black" stroke-width="1.5"/>
+  <text x="690" y="105" text-anchor="middle" class="label">resume_documents</text>
+  
+  <!-- Arrow from Upload File to resume_documents -->
+  <line x1="480" y1="100" x2="620" y2="100" stroke="black" stroke-width="1.5"/>
+  <polygon points="620,100 613,95 613,105" fill="black"/>
+  <text x="550" y="90" text-anchor="middle" class="label">file_data</text>
+  
+  <!-- Data Store: raw_text (right-open box) -->
+  <line x1="620" y1="165" x2="720" y2="165" stroke="black" stroke-width="1.5"/>
+  <line x1="620" y1="165" x2="620" y2="195" stroke="black" stroke-width="1.5"/>
+  <line x1="620" y1="195" x2="720" y2="195" stroke="black" stroke-width="1.5"/>
+  <text x="670" y="185" text-anchor="middle" class="label">raw_text</text>
+  
+  <!-- Arrow from Extract Text to raw_text -->
+  <line x1="480" y1="180" x2="620" y2="180" stroke="black" stroke-width="1.5"/>
+  <polygon points="620,180 613,175 613,185" fill="black"/>
+  <text x="550" y="170" text-anchor="middle" class="label">extracted_text</text>
+  
+  <!-- Data Store: parse_runs (right-open box) -->
+  <line x1="620" y1="245" x2="730" y2="245" stroke="black" stroke-width="1.5"/>
+  <line x1="620" y1="245" x2="620" y2="275" stroke="black" stroke-width="1.5"/>
+  <line x1="620" y1="275" x2="730" y2="275" stroke="black" stroke-width="1.5"/>
+  <text x="675" y="265" text-anchor="middle" class="label">parse_runs</text>
+  
+  <!-- Arrow from Parse Resume to parse_runs -->
+  <line x1="480" y1="260" x2="620" y2="260" stroke="black" stroke-width="1.5"/>
+  <polygon points="620,260 613,255 613,265" fill="black"/>
+  <text x="550" y="250" text-anchor="middle" class="label">parse_result</text>
+  
+  <!-- Data Store: candidates (right-open box) -->
+  <line x1="620" y1="310" x2="720" y2="310" stroke="black" stroke-width="1.5"/>
+  <line x1="620" y1="310" x2="620" y2="340" stroke="black" stroke-width="1.5"/>
+  <line x1="620" y1="340" x2="720" y2="340" stroke="black" stroke-width="1.5"/>
+  <text x="670" y="330" text-anchor="middle" class="label">candidates</text>
+  
+  <!-- Arrow from Parse Resume to candidates -->
+  <line x1="480" y1="275" x2="550" y2="290" stroke="black" stroke-width="1"/>
+  <line x1="550" y1="290" x2="620" y2="325" stroke="black" stroke-width="1"/>
+  <polygon points="620,325 612,320 612,330" fill="black"/>
+  <text x="560" y="320" text-anchor="middle" class="label">candidate_data</text>
+  
+  <!-- Arrow from View Status reading from parse_runs -->
+  <line x1="480" y1="340" x2="550" y2="340" stroke="black" stroke-width="1"/>
+  <line x1="550" y1="340" x2="550" y2="275" stroke="black" stroke-width="1"/>
+  <line x1="550" y1="275" x2="620" y2="270" stroke="black" stroke-width="1"/>
+  <polygon points="480,340 487,335 487,345" fill="black"/>
+  <text x="530" y="355" text-anchor="middle" class="label">status_info</text>
+  
+  <!-- Arrow from Retry Parse to parse_runs -->
+  <line x1="480" y1="420" x2="580" y2="420" stroke="black" stroke-width="1"/>
+  <line x1="580" y1="420" x2="580" y2="275" stroke="black" stroke-width="1"/>
+  <line x1="580" y1="275" x2="620" y2="265" stroke="black" stroke-width="1"/>
+  <polygon points="620,265 613,260 613,270" fill="black"/>
+  <text x="550" y="435" text-anchor="middle" class="label">retry_request</text>
+  
+  <!-- OpenRouter API (External System) -->
+  <rect x="830" y="235" width="100" height="50" fill="none" stroke="black" stroke-width="2"/>
+  <text x="880" y="255" text-anchor="middle" class="label">OpenRouter</text>
+  <text x="880" y="270" text-anchor="middle" class="label">LLM API</text>
+  
+  <!-- Arrow from parse_runs to OpenRouter -->
+  <line x1="730" y1="260" x2="830" y2="260" stroke="black" stroke-width="1"/>
+  <polygon points="830,260 823,255 823,265" fill="black"/>
+  <text x="780" y="250" text-anchor="middle" class="label">prompt</text>
+  
+  <!-- Arrow from OpenRouter back to parse_runs -->
+  <line x1="830" y1="275" x2="730" y2="275" stroke="black" stroke-width="1"/>
+  <polygon points="730,275 737,270 737,280" fill="black"/>
+  <text x="780" y="290" text-anchor="middle" class="label">response</text>
+</svg>

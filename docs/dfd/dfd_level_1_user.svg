@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 700" width="1100" height="700">
+  <style>
+    text { font-family: Arial, sans-serif; font-size: 14px; }
+    .title { font-size: 24px; font-weight: bold; }
+    .label { font-size: 11px; }
+    .process { font-size: 12px; }
+  </style>
+  
+  <!-- Title -->
+  <text x="550" y="40" text-anchor="middle" class="title">LEVEL 1 USER</text>
+  
+  <!-- USER Entity (Rectangle) -->
+  <rect x="30" y="300" width="80" height="50" fill="none" stroke="black" stroke-width="2"/>
+  <text x="70" y="330" text-anchor="middle">USER</text>
+  
+  <!-- Login Process (Circle) -->
+  <ellipse cx="180" cy="325" rx="40" ry="25" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="180" y="330" text-anchor="middle" class="process">login</text>
+  
+  <!-- Arrow from USER to Login -->
+  <line x1="110" y1="325" x2="140" y2="325" stroke="black" stroke-width="1.5"/>
+  <polygon points="140,325 133,320 133,330" fill="black"/>
+  
+  <!-- Central System Process (Large Circle) -->
+  <circle cx="350" cy="325" r="80" fill="none" stroke="black" stroke-width="2"/>
+  <text x="350" y="310" text-anchor="middle" class="process">RESUME PARSE</text>
+  <text x="350" y="325" text-anchor="middle" class="process">PRO AI</text>
+  <text x="350" y="340" text-anchor="middle" class="process">SYSTEM</text>
+  
+  <!-- Arrow from Login to System -->
+  <line x1="220" y1="325" x2="270" y2="325" stroke="black" stroke-width="1.5"/>
+  <polygon points="270,325 263,320 263,330" fill="black"/>
+  
+  <!-- Process 1: Upload Resume -->
+  <ellipse cx="580" cy="100" rx="70" ry="28" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="580" y="105" text-anchor="middle" class="process">upload resume</text>
+  
+  <!-- Process 2: View Parse Status -->
+  <ellipse cx="580" cy="180" rx="70" ry="28" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="580" y="175" text-anchor="middle" class="process">view parse</text>
+  <text x="580" y="190" text-anchor="middle" class="process">status</text>
+  
+  <!-- Process 3: Search Candidates -->
+  <ellipse cx="580" cy="260" rx="70" ry="28" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="580" y="255" text-anchor="middle" class="process">search</text>
+  <text x="580" y="270" text-anchor="middle" class="process">candidates</text>
+  
+  <!-- Process 4: View Candidate Details -->
+  <ellipse cx="580" cy="340" rx="70" ry="28" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="580" y="335" text-anchor="middle" class="process">view candidate</text>
+  <text x="580" y="350" text-anchor="middle" class="process">details</text>
+  
+  <!-- Process 5: Edit Candidate -->
+  <ellipse cx="580" cy="420" rx="70" ry="28" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="580" y="425" text-anchor="middle" class="process">edit candidate</text>
+  
+  <!-- Process 6: Retry Parsing -->
+  <ellipse cx="580" cy="500" rx="70" ry="28" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="580" y="505" text-anchor="middle" class="process">retry parsing</text>
+  
+  <!-- Process 7: View Profile -->
+  <ellipse cx="580" cy="580" rx="70" ry="28" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="580" y="585" text-anchor="middle" class="process">view profile</text>
+  
+  <!-- Arrows from System to Processes -->
+  <line x1="410" y1="270" x2="510" y2="110" stroke="black" stroke-width="1"/>
+  <polygon points="510,110 502,115 506,122" fill="black"/>
+  
+  <line x1="420" y1="285" x2="510" y2="180" stroke="black" stroke-width="1"/>
+  <polygon points="510,180 502,182 505,191" fill="black"/>
+  
+  <line x1="430" y1="310" x2="510" y2="260" stroke="black" stroke-width="1"/>
+  <polygon points="510,260 502,258 503,268" fill="black"/>
+  
+  <line x1="430" y1="340" x2="510" y2="340" stroke="black" stroke-width="1"/>
+  <polygon points="510,340 503,335 503,345" fill="black"/>
+  
+  <line x1="425" y1="365" x2="510" y2="420" stroke="black" stroke-width="1"/>
+  <polygon points="510,420 502,415 501,425" fill="black"/>
+  
+  <line x1="415" y1="385" x2="510" y2="500" stroke="black" stroke-width="1"/>
+  <polygon points="510,500 503,493 500,502" fill="black"/>
+  
+  <line x1="400" y1="400" x2="510" y2="580" stroke="black" stroke-width="1"/>
+  <polygon points="510,580 504,572 499,580" fill="black"/>
+  
+  <!-- Data Store: resume_documents (right-open box) -->
+  <line x1="800" y1="85" x2="920" y2="85" stroke="black" stroke-width="1.5"/>
+  <line x1="800" y1="85" x2="800" y2="115" stroke="black" stroke-width="1.5"/>
+  <line x1="800" y1="115" x2="920" y2="115" stroke="black" stroke-width="1.5"/>
+  <text x="860" y="105" text-anchor="middle" class="label">resume_documents</text>
+  
+  <!-- Arrow from upload resume to resume_documents -->
+  <line x1="650" y1="100" x2="800" y2="100" stroke="black" stroke-width="1.5"/>
+  <polygon points="800,100 793,95 793,105" fill="black"/>
+  
+  <!-- Data Store: parse_runs (right-open box) -->
+  <line x1="800" y1="165" x2="900" y2="165" stroke="black" stroke-width="1.5"/>
+  <line x1="800" y1="165" x2="800" y2="195" stroke="black" stroke-width="1.5"/>
+  <line x1="800" y1="195" x2="900" y2="195" stroke="black" stroke-width="1.5"/>
+  <text x="850" y="185" text-anchor="middle" class="label">parse_runs</text>
+  
+  <!-- Arrow from view parse status to parse_runs -->
+  <line x1="650" y1="180" x2="800" y2="180" stroke="black" stroke-width="1.5"/>
+  <polygon points="800,180 793,175 793,185" fill="black"/>
+  
+  <!-- Data Store: candidates (right-open box) -->
+  <line x1="800" y1="290" x2="890" y2="290" stroke="black" stroke-width="1.5"/>
+  <line x1="800" y1="290" x2="800" y2="320" stroke="black" stroke-width="1.5"/>
+  <line x1="800" y1="320" x2="890" y2="320" stroke="black" stroke-width="1.5"/>
+  <text x="845" y="310" text-anchor="middle" class="label">candidates</text>
+  
+  <!-- Arrow from search candidates to candidates -->
+  <line x1="650" y1="260" x2="795" y2="295" stroke="black" stroke-width="1.5"/>
+  <polygon points="795,295 786,292 788,302" fill="black"/>
+  
+  <!-- Arrow from view candidate details to candidates -->
+  <line x1="650" y1="340" x2="800" y2="310" stroke="black" stroke-width="1.5"/>
+  <polygon points="800,310 791,308 792,318" fill="black"/>
+  
+  <!-- Data Store: skills (right-open box) -->
+  <line x1="800" y1="335" x2="870" y2="335" stroke="black" stroke-width="1.5"/>
+  <line x1="800" y1="335" x2="800" y2="365" stroke="black" stroke-width="1.5"/>
+  <line x1="800" y1="365" x2="870" y2="365" stroke="black" stroke-width="1.5"/>
+  <text x="835" y="355" text-anchor="middle" class="label">skills</text>
+  
+  <!-- Arrow from view candidate details to skills -->
+  <line x1="650" y1="350" x2="800" y2="350" stroke="black" stroke-width="1.5"/>
+  <polygon points="800,350 793,345 793,355" fill="black"/>
+  
+  <!-- Data Store: education_entries (right-open box) -->
+  <line x1="800" y1="380" x2="920" y2="380" stroke="black" stroke-width="1.5"/>
+  <line x1="800" y1="380" x2="800" y2="410" stroke="black" stroke-width="1.5"/>
+  <line x1="800" y1="410" x2="920" y2="410" stroke="black" stroke-width="1.5"/>
+  <text x="860" y="400" text-anchor="middle" class="label">education_entries</text>
+  
+  <!-- Data Store: experience_entries (right-open box) -->
+  <line x1="800" y1="425" x2="930" y2="425" stroke="black" stroke-width="1.5"/>
+  <line x1="800" y1="425" x2="800" y2="455" stroke="black" stroke-width="1.5"/>
+  <line x1="800" y1="455" x2="930" y2="455" stroke="black" stroke-width="1.5"/>
+  <text x="865" y="445" text-anchor="middle" class="label">experience_entries</text>
+  
+  <!-- Arrow from edit candidate to candidates -->
+  <line x1="650" y1="420" x2="795" y2="395" stroke="black" stroke-width="1.5"/>
+  <polygon points="795,395 786,393 788,403" fill="black"/>
+  
+  <!-- Arrow from retry parsing to parse_runs -->
+  <path d="M 650 500 Q 750 500 750 400 Q 750 250 795 195" fill="none" stroke="black" stroke-width="1"/>
+  <polygon points="795,195 786,200 791,208" fill="black"/>
+  
+  <!-- Data Store: users (right-open box) -->
+  <line x1="800" y1="565" x2="870" y2="565" stroke="black" stroke-width="1.5"/>
+  <line x1="800" y1="565" x2="800" y2="595" stroke="black" stroke-width="1.5"/>
+  <line x1="800" y1="595" x2="870" y2="595" stroke="black" stroke-width="1.5"/>
+  <text x="835" y="585" text-anchor="middle" class="label">users</text>
+  
+  <!-- Arrow from view profile to users -->
+  <line x1="650" y1="580" x2="800" y2="580" stroke="black" stroke-width="1.5"/>
+  <polygon points="800,580 793,575 793,585" fill="black"/>
+</svg>
