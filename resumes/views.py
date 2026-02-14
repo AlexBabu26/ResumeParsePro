@@ -508,9 +508,19 @@ class ResumeUploadViewSet(viewsets.ViewSet):
         
         if requirements:
             response_data["requirements_applied"] = requirements
-            if rejected:
+            if run.status == "rejected" or rejected:
                 response_data["rejected"] = True
-                response_data["rejection_reasons"] = rejection_reasons
+                response_data["status"] = "rejected"
+                # Get reasons from run warnings if task failed
+                reasons = []
+                if rejected: 
+                    reasons = rejection_reasons
+                elif isinstance(run.warnings, list):
+                    for w in run.warnings:
+                        if w.startswith("REQUIREMENTS_FAILED: "):
+                            reasons.append(w.replace("REQUIREMENTS_FAILED: ", ""))
+                
+                response_data["rejection_reasons"] = reasons
             else:
                 response_data["accepted"] = True
         
@@ -646,26 +656,29 @@ class ResumeUploadViewSet(viewsets.ViewSet):
                     run.refresh_from_db()
                     latest_candidate = Candidate.objects.filter(parse_run=run).order_by("-created_at").first()
                     
-                    # Check requirements if provided (sync mode only)
-                    if requirements and latest_candidate:
-                        meets, reasons = _candidate_meets_requirements(latest_candidate, requirements)
-                        if not meets:
-                            # Discard candidate and related data
-                            discarded.append({
-                                "filename": f.name,
-                                "candidate_id": latest_candidate.id,
-                                "reasons": reasons,
-                            })
-                            latest_candidate.delete()  # This will cascade delete skills, education, experience
-                            results.append({
-                                "filename": f.name,
-                                "resume_document_id": doc.id,
-                                "parse_run_id": run.id,
-                                "status": run.status,
-                                "discarded": True,
-                                "discard_reasons": reasons,
-                            })
-                            continue
+                    # If task didn't discard but view should (legacy/safety), or if task ALREADY discarded
+                    if (requirements and latest_candidate and not _candidate_meets_requirements(latest_candidate, requirements)[0]) or (run.status == "rejected"):
+                        reasons = []
+                        if run.status == "rejected" and isinstance(run.warnings, list):
+                            for w in run.warnings:
+                                if w.startswith("REQUIREMENTS_FAILED: "):
+                                    reasons.append(w.replace("REQUIREMENTS_FAILED: ", ""))
+                        
+                        if not reasons and latest_candidate:
+                            # Re-check if not found in status
+                            meets, reasons = _candidate_meets_requirements(latest_candidate, requirements)
+                        
+                        results.append({
+                            "filename": f.name,
+                            "resume_document_id": doc.id,
+                            "parse_run_id": run.id,
+                            "status": "rejected",
+                            "discarded": True,
+                            "discard_reasons": reasons,
+                        })
+                        if latest_candidate:
+                            latest_candidate.delete()
+                        continue
                     
                     results.append({
                         "filename": f.name,
@@ -704,11 +717,11 @@ class ResumeUploadViewSet(viewsets.ViewSet):
             "total": len(validated_files),
             "successful": len(results),
             "matching": len([r for r in all_results if r.get("accepted", False) and not r.get("discarded", False)]),
-            "rejected": len([r for r in all_results if r.get("discarded", False)]),
-            "errors": len(errors),
-            "results": all_results,  # Include all results with status indicators
-            "accepted": [r for r in all_results if r.get("accepted", False) and not r.get("discarded", False)],
-            "rejected": [r for r in all_results if r.get("discarded", False)],
+            "rejected_count": len([r for r in all_results if r.get("discarded", False)]),
+            "error_count": len(errors),
+            "results": all_results,
+            "accepted_list": [r for r in all_results if r.get("accepted", False) and not r.get("discarded", False)],
+            "rejected_list": [r for r in all_results if r.get("discarded", False)],
             "errors": errors,
         }
         
@@ -718,7 +731,7 @@ class ResumeUploadViewSet(viewsets.ViewSet):
         if requirements:
             summary["requirements_applied"] = requirements
             if sync:
-                summary["note"] = f"Requirements applied. {summary['matching']} candidates accepted, {summary['rejected']} rejected."
+                summary["note"] = f"Requirements applied. {summary['matching']} candidates accepted, {summary['rejected_count']} rejected."
             else:
                 summary["note"] = "Requirements will be checked after async processing completes. Check parse runs for final status."
 

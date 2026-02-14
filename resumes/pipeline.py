@@ -212,6 +212,108 @@ def check_rate_limit_status() -> Dict[str, Any]:
     return {"is_free_tier": True, "limit_remaining": None, "usage_daily": 0}
 
 
+def groq_call(
+    system_prompt: str,
+    user_prompt: str,
+    temperature: float = 0.1,
+    model: str = "llama-3.3-70b-versatile",
+) -> Dict[str, Any]:
+    """
+    Fallback to Groq API when OpenRouter is rate limited.
+    """
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        api_key = getattr(settings, "GROQ_API_KEY", None)
+    
+    if not api_key:
+        logger.warning("GROQ_API_KEY not set. Cannot fallback to Groq.")
+        raise RuntimeError("GROQ_API_KEY not set")
+
+    logger.info(f"Falling back to Groq with model {model}...")
+    
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    
+    # Groq supports JSON mode which helps with our structured extraction
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": temperature,
+        "response_format": {"type": "json_object"},
+    }
+    
+    t0 = time.time()
+    resp = None
+    
+    # Simple retry loop for Groq rate limits
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=60)
+            
+            # Log Groq Rate Limit Headers (Available on all responses)
+            # Reference: https://console.groq.com/docs/rate-limits
+            logging.debug("Groq API Rate Limits", extra={
+                "remaining_requests": resp.headers.get("x-ratelimit-remaining-requests"),
+                "remaining_tokens": resp.headers.get("x-ratelimit-remaining-tokens"),
+                "reset_requests": resp.headers.get("x-ratelimit-reset-requests"),
+                "reset_tokens": resp.headers.get("x-ratelimit-reset-tokens"),
+            })
+
+            if resp.status_code == 429:
+                retry_after = float(resp.headers.get("retry-after", 5.0))
+                logger.warning(f"Groq Rate Limited (429). Retrying after {retry_after}s", extra={
+                    "attempt": attempt + 1,
+                    "retry_after": retry_after,
+                    "remaining_requests": resp.headers.get("x-ratelimit-remaining-requests"),
+                })
+                
+                if attempt < max_retries - 1:
+                    # Respect the retry-after header
+                    time.sleep(retry_after)
+                    continue
+                else:
+                    logger.error("Groq rate limit retries exhausted.")
+                    resp.raise_for_status()
+            
+            resp.raise_for_status()
+            break # Success
+            
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries - 1:
+                logger.warning(f"Groq request failed: {e}. Retrying...")
+                time.sleep(2)
+                continue
+            logger.error(f"Groq API error: {e}")
+            raise e
+
+    if not resp:
+        raise RuntimeError("Groq API request failed (no response)")
+        
+    latency_ms = int((time.time() - t0) * 1000)
+    data = resp.json()
+    content = data["choices"][0]["message"]["content"]
+    
+    usage = data.get("usage", {})
+    input_tokens = usage.get("prompt_tokens", 0)
+    output_tokens = usage.get("completion_tokens", 0)
+    
+    return {
+        "content": content,
+        "latency_ms": latency_ms,
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "cost_usd": 0.0,  # Groq pricing is separate, treating as 0/included for now
+        "model": model,
+    }
+
+
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=2, min=4, max=60),  # Longer backoff for rate limits
@@ -311,6 +413,20 @@ def openrouter_call(
 
     # Handle rate limiting with longer backoff
     if resp.status_code == 429:
+        logger.warning("OpenRouter rate limited (429). Attempting Groq fallback...")
+        try:
+            # Fallback to Groq immediately to avoid disruption
+            return groq_call(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                temperature=temperature,
+                # Force a capable model on Groq (User suggested or default)
+                model="llama-3.3-70b-versatile" 
+            )
+        except Exception as e:
+            logger.error(f"Groq fallback failed: {e}")
+            # If fallback fails, proceed to standard retry logic
+        
         retry_after = resp.headers.get("Retry-After", "60")
         logger.warning("OpenRouter rate limited", extra={
             "model": model,
@@ -623,6 +739,7 @@ def call_requirements_validation(candidate_data: Dict[str, Any], requirements: D
     
     actual_model = r.get("model", model)
     return {
+        "parsed_json": parsed,
         "meets_requirements": bool(parsed.get("meets_requirements", False)),
         "reasons": parsed.get("reasons", []),
         "confidence": _clamp01(parsed.get("confidence", 0.0)),
