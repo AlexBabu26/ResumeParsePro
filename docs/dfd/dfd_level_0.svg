@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 400" width="900" height="400">
+  <style>
+    text { font-family: Arial, sans-serif; font-size: 14px; }
+    .title { font-size: 24px; font-weight: bold; }
+    .label { font-size: 12px; }
+  </style>
+  
+  <!-- Title -->
+  <text x="450" y="40" text-anchor="middle" class="title">DFD Level - 0</text>
+  
+  <!-- USER Entity (Rectangle) -->
+  <rect x="50" y="160" width="100" height="50" fill="none" stroke="black" stroke-width="2"/>
+  <text x="100" y="190" text-anchor="middle">USER</text>
+  
+  <!-- Central Process (Circle) - RESUME PARSE PRO AI -->
+  <circle cx="450" cy="185" r="100" fill="none" stroke="black" stroke-width="2"/>
+  <text x="450" y="175" text-anchor="middle" font-size="13">RESUME PARSE</text>
+  <text x="450" y="195" text-anchor="middle" font-size="13">PRO AI</text>
+  
+  <!-- ADMIN Entity (Rectangle) -->
+  <rect x="750" y="160" width="100" height="50" fill="none" stroke="black" stroke-width="2"/>
+  <text x="800" y="190" text-anchor="middle">ADMIN</text>
+  
+  <!-- Data Flow: USER to System (REQUEST) -->
+  <line x1="150" y1="175" x2="350" y2="175" stroke="black" stroke-width="1.5"/>
+  <polygon points="350,175 340,170 340,180" fill="black"/>
+  <text x="250" y="165" text-anchor="middle" class="label">REQUEST</text>
+  
+  <!-- Data Flow: System to USER (RESPONSE) -->
+  <line x1="350" y1="195" x2="150" y2="195" stroke="black" stroke-width="1.5"/>
+  <polygon points="150,195 160,190 160,200" fill="black"/>
+  <text x="250" y="225" text-anchor="middle" class="label">RESPONSE</text>
+  
+  <!-- Data Flow: ADMIN to System (REQUEST) -->
+  <line x1="750" y1="175" x2="550" y2="175" stroke="black" stroke-width="1.5"/>
+  <polygon points="550,175 560,170 560,180" fill="black"/>
+  <text x="650" y="165" text-anchor="middle" class="label">REQUEST</text>
+  
+  <!-- Data Flow: System to ADMIN (RESPONSE) -->
+  <line x1="550" y1="195" x2="750" y2="195" stroke="black" stroke-width="1.5"/>
+  <polygon points="750,195 740,190 740,200" fill="black"/>
+  <text x="650" y="225" text-anchor="middle" class="label">RESPONSE</text>
+  
+  <!-- Legend -->
+  <text x="450" y="350" text-anchor="middle" font-size="11" fill="#666">Context Diagram - Resume Parse Pro AI System</text>
+</svg>

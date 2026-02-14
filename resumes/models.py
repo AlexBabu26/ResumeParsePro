@@ -36,6 +36,7 @@ class ParseRun(models.Model):
         ("success", "Success"),
         ("partial", "Partial"),
         ("failed", "Failed"),
+        ("rejected", "Rejected"),
     ]
 
     PROGRESS_STAGE_CHOICES = [

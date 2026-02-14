@@ -28,6 +28,14 @@ PHONE_RE = re.compile(r"(?<!\d)(?:\+?\d[\d \-().]{7,}\d)(?!\d)")
 
 # Model pricing per 1M tokens (USD)
 MODEL_PRICING = {
+    # Free tier models - $0 cost
+    "openai/gpt-oss-20b:free": {"input": 0.0, "output": 0.0},
+    "qwen/qwen3-next-80b-a3b-instruct:free": {"input": 0.0, "output": 0.0},
+    "z-ai/glm-4.5-air:free": {"input": 0.0, "output": 0.0},
+    "nvidia/nemotron-3-nano-30b-a3b:free": {"input": 0.0, "output": 0.0},
+    "google/gemini-2.0-flash-exp:free": {"input": 0.0, "output": 0.0},
+    "xiaomi/mimo-v2-flash:free": {"input": 0.0, "output": 0.0},
+    # Paid models
     "openai/gpt-4o-mini": {"input": 0.15, "output": 0.60},
     "openai/gpt-4o": {"input": 2.50, "output": 10.00},
     "anthropic/claude-3-haiku": {"input": 0.25, "output": 1.25},
@@ -35,7 +43,6 @@ MODEL_PRICING = {
     "anthropic/claude-3-opus": {"input": 15.00, "output": 75.00},
     "google/gemini-pro": {"input": 0.125, "output": 0.375},
     "meta-llama/llama-3-8b-instruct": {"input": 0.05, "output": 0.05},
-    "xiaomi/mimo-v2-flash:free": {"input": 0.0, "output": 0.0},
 }
 
 CANONICAL_TEMPLATE = {
@@ -172,24 +179,177 @@ def extract_known_pii(text: str) -> Dict[str, List[str]]:
     return {"emails_found": emails, "phones_found": phones, "links_found": urls}
 
 
+def check_rate_limit_status() -> Dict[str, Any]:
+    """
+    Check remaining API credits and rate limit status.
+    See: https://openrouter.ai/docs/api/reference/limits
+    
+    Returns dict with:
+    - is_free_tier: bool
+    - limit_remaining: number or None
+    - usage_daily: number
+    """
+    api_key = settings.OPENROUTER_API_KEY
+    if not api_key:
+        return {"is_free_tier": True, "limit_remaining": None, "usage_daily": 0}
+    
+    try:
+        response = requests.get(
+            "https://openrouter.ai/api/v1/key",
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=10
+        )
+        if response.status_code == 200:
+            data = response.json().get("data", {})
+            return {
+                "is_free_tier": data.get("is_free_tier", True),
+                "limit_remaining": data.get("limit_remaining"),
+                "usage_daily": data.get("usage_daily", 0),
+            }
+    except Exception as e:
+        logger.warning("Failed to check rate limit status", extra={"error": str(e)})
+    
+    return {"is_free_tier": True, "limit_remaining": None, "usage_daily": 0}
+
+
+def groq_call(
+    system_prompt: str,
+    user_prompt: str,
+    temperature: float = 0.1,
+    model: str = "llama-3.3-70b-versatile",
+) -> Dict[str, Any]:
+    """
+    Fallback to Groq API when OpenRouter is rate limited.
+    """
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        api_key = getattr(settings, "GROQ_API_KEY", None)
+    
+    if not api_key:
+        logger.warning("GROQ_API_KEY not set. Cannot fallback to Groq.")
+        raise RuntimeError("GROQ_API_KEY not set")
+
+    logger.info(f"Falling back to Groq with model {model}...")
+    
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    
+    # Groq supports JSON mode which helps with our structured extraction
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": temperature,
+        "response_format": {"type": "json_object"},
+    }
+    
+    t0 = time.time()
+    resp = None
+    
+    # Simple retry loop for Groq rate limits
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=60)
+            
+            # Log Groq Rate Limit Headers (Available on all responses)
+            # Reference: https://console.groq.com/docs/rate-limits
+            logging.debug("Groq API Rate Limits", extra={
+                "remaining_requests": resp.headers.get("x-ratelimit-remaining-requests"),
+                "remaining_tokens": resp.headers.get("x-ratelimit-remaining-tokens"),
+                "reset_requests": resp.headers.get("x-ratelimit-reset-requests"),
+                "reset_tokens": resp.headers.get("x-ratelimit-reset-tokens"),
+            })
+
+            if resp.status_code == 429:
+                retry_after = float(resp.headers.get("retry-after", 5.0))
+                logger.warning(f"Groq Rate Limited (429). Retrying after {retry_after}s", extra={
+                    "attempt": attempt + 1,
+                    "retry_after": retry_after,
+                    "remaining_requests": resp.headers.get("x-ratelimit-remaining-requests"),
+                })
+                
+                if attempt < max_retries - 1:
+                    # Respect the retry-after header
+                    time.sleep(retry_after)
+                    continue
+                else:
+                    logger.error("Groq rate limit retries exhausted.")
+                    resp.raise_for_status()
+            
+            resp.raise_for_status()
+            break # Success
+            
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries - 1:
+                logger.warning(f"Groq request failed: {e}. Retrying...")
+                time.sleep(2)
+                continue
+            logger.error(f"Groq API error: {e}")
+            raise e
+
+    if not resp:
+        raise RuntimeError("Groq API request failed (no response)")
+        
+    latency_ms = int((time.time() - t0) * 1000)
+    data = resp.json()
+    content = data["choices"][0]["message"]["content"]
+    
+    usage = data.get("usage", {})
+    input_tokens = usage.get("prompt_tokens", 0)
+    output_tokens = usage.get("completion_tokens", 0)
+    
+    return {
+        "content": content,
+        "latency_ms": latency_ms,
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "cost_usd": 0.0,  # Groq pricing is separate, treating as 0/included for now
+        "model": model,
+    }
+
+
 @retry(
     stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=30),
+    wait=wait_exponential(multiplier=2, min=4, max=60),  # Longer backoff for rate limits
     retry=retry_if_exception_type((requests.Timeout, requests.ConnectionError)),
     before_sleep=before_sleep_log(logger, logging.WARNING),
     reraise=True,
 )
-def openrouter_call(model: str, system_prompt: str, user_prompt: str, temperature: float, timeout_s: int = None) -> Dict[str, Any]:
+def openrouter_call(
+    model: str, 
+    system_prompt: str, 
+    user_prompt: str, 
+    temperature: float, 
+    timeout_s: int = None,
+    fallback_models: List[str] = None,
+) -> Dict[str, Any]:
     """
-    Call OpenRouter API with retry logic and cost tracking.
+    Call OpenRouter API with retry logic, fallback models, and cost tracking.
     
     Features:
     - Automatic retry with exponential backoff for transient errors
+    - Model fallbacks for rate limit resilience (free tier)
     - Model-specific timeouts
     - Cost calculation
     - Structured logging
+    
+    Args:
+        model: Primary model to use
+        system_prompt: System prompt for the LLM
+        user_prompt: User prompt with the actual request
+        temperature: Sampling temperature (0-2)
+        timeout_s: Request timeout in seconds
+        fallback_models: List of fallback models if primary is rate-limited
+    
+    See: https://openrouter.ai/docs/guides/routing/model-fallbacks
     """
-    api_key = "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"
+    api_key = settings.OPENROUTER_API_KEY
     if not api_key:
         logger.error("OPENROUTER_API_KEY not configured")
         raise RuntimeError("OPENROUTER_API_KEY not set")
@@ -198,8 +358,18 @@ def openrouter_call(model: str, system_prompt: str, user_prompt: str, temperatur
     if timeout_s is None:
         timeout_s = get_model_timeout(model)
 
+    # Get fallback models from settings if not provided
+    if fallback_models is None:
+        fallback_models = getattr(settings, "OPENROUTER_FALLBACK_MODELS", [])
+
     url = "https://openrouter.ai/api/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://parsepro.local",  # Identify app for OpenRouter rankings
+        "X-Title": "Parse Pro AI",
+    }
+    
     payload = {
         "model": model,
         "temperature": float(temperature),
@@ -208,9 +378,16 @@ def openrouter_call(model: str, system_prompt: str, user_prompt: str, temperatur
             {"role": "user", "content": user_prompt},
         ],
     }
+    
+    # Add fallback models for rate limit resilience (free tier optimization)
+    # See: https://openrouter.ai/docs/guides/routing/model-fallbacks
+    if fallback_models:
+        payload["models"] = [model] + fallback_models
+        payload["route"] = "fallback"
 
     logger.info("OpenRouter API call starting", extra={
         "model": model,
+        "has_fallbacks": bool(fallback_models),
         "temperature": temperature,
         "timeout_s": timeout_s,
         "prompt_length": len(user_prompt),
@@ -234,12 +411,30 @@ def openrouter_call(model: str, system_prompt: str, user_prompt: str, temperatur
     
     latency_ms = int((time.time() - t0) * 1000)
 
+    # Handle rate limiting with longer backoff
     if resp.status_code == 429:
+        logger.warning("OpenRouter rate limited (429). Attempting Groq fallback...")
+        try:
+            # Fallback to Groq immediately to avoid disruption
+            return groq_call(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                temperature=temperature,
+                # Force a capable model on Groq (User suggested or default)
+                model="llama-3.3-70b-versatile" 
+            )
+        except Exception as e:
+            logger.error(f"Groq fallback failed: {e}")
+            # If fallback fails, proceed to standard retry logic
+        
+        retry_after = resp.headers.get("Retry-After", "60")
         logger.warning("OpenRouter rate limited", extra={
             "model": model,
             "status_code": resp.status_code,
+            "retry_after": retry_after,
         })
-        raise requests.ConnectionError("Rate limited (429)")
+        # Raise as ConnectionError to trigger retry with exponential backoff
+        raise requests.ConnectionError(f"Rate limited (429). Retry after {retry_after}s")
     
     if resp.status_code >= 500:
         logger.warning("OpenRouter server error", extra={
@@ -260,12 +455,17 @@ def openrouter_call(model: str, system_prompt: str, user_prompt: str, temperatur
     content = data["choices"][0]["message"]["content"]
     usage = data.get("usage") or {}
     
+    # Track which model was actually used (may differ due to fallback)
+    actual_model = data.get("model", model)
+    
     input_tokens = usage.get("prompt_tokens")
     output_tokens = usage.get("completion_tokens")
-    cost = calculate_cost(model, input_tokens, output_tokens)
+    cost = calculate_cost(actual_model, input_tokens, output_tokens)
 
     logger.info("OpenRouter API call complete", extra={
-        "model": model,
+        "requested_model": model,
+        "actual_model": actual_model,
+        "used_fallback": actual_model != model,
         "latency_ms": latency_ms,
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
@@ -278,12 +478,17 @@ def openrouter_call(model: str, system_prompt: str, user_prompt: str, temperatur
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
         "cost_usd": cost,
+        "model": actual_model,  # Return actual model used (important for fallbacks)
     }
 
 
 def call_extract(resume_text: str, known_pii: Dict[str, List[str]]) -> Dict[str, Any]:
-    model = getattr(settings, "OPENROUTER_EXTRACT_MODEL", "openai/gpt-4o-mini")
+    """
+    Extract structured resume data using LLM with fallback models for rate limit resilience.
+    """
+    model = getattr(settings, "OPENROUTER_EXTRACT_MODEL", "openai/gpt-oss-20b:free")
     temperature = float(getattr(settings, "OPENROUTER_TEMPERATURE", 0.1))
+    fallback_models = getattr(settings, "OPENROUTER_FALLBACK_MODELS", [])
 
     user_prompt = (
         "Extract structured resume data from the text below.\n\n"
@@ -296,9 +501,17 @@ def call_extract(resume_text: str, known_pii: Dict[str, List[str]]) -> Dict[str,
         ">>>"
     )
 
-    r = openrouter_call(model, EXTRACTION_SYSTEM_PROMPT, user_prompt, temperature, timeout_s=90)
+    r = openrouter_call(
+        model=model, 
+        system_prompt=EXTRACTION_SYSTEM_PROMPT, 
+        user_prompt=user_prompt, 
+        temperature=temperature, 
+        timeout_s=90,
+        fallback_models=fallback_models,
+    )
     parsed = parse_json_safely(r["content"])
-    return {"parsed_json": parsed, "model": model, **r}
+    # Return actual model used (may be fallback)
+    return {"parsed_json": parsed, **r}
 
 
 def validate_against_schema(llm_json: Dict[str, Any]) -> List[str]:
@@ -405,9 +618,10 @@ def normalize_and_validate(llm_json: Dict[str, Any], raw_text: str, known_pii: D
 
 
 def call_classify(normalized_json: Dict[str, Any]) -> Dict[str, Any]:
-    """Classify candidate role and seniority using LLM."""
-    model = getattr(settings, "OPENROUTER_CLASSIFY_MODEL", "openai/gpt-4o-mini")
+    """Classify candidate role and seniority using LLM with fallback models."""
+    model = getattr(settings, "OPENROUTER_CLASSIFY_MODEL", "openai/gpt-oss-20b:free")
     temperature = float(getattr(settings, "OPENROUTER_CLASSIFY_TEMPERATURE", 0.1))
+    fallback_models = getattr(settings, "OPENROUTER_FALLBACK_MODELS", [])
 
     user_prompt = (
         "Classify the candidate based on the resume data.\n\n"
@@ -421,20 +635,29 @@ def call_classify(normalized_json: Dict[str, Any]) -> Dict[str, Any]:
     )
 
     logger.debug("Calling classify LLM", extra={"model": model})
-    r = openrouter_call(model, CLASSIFY_SYSTEM_PROMPT, user_prompt, temperature)
+    r = openrouter_call(
+        model=model, 
+        system_prompt=CLASSIFY_SYSTEM_PROMPT, 
+        user_prompt=user_prompt, 
+        temperature=temperature,
+        fallback_models=fallback_models,
+    )
     parsed = parse_json_safely(r["content"])
+    actual_model = r.get("model", model)
     logger.info("Classification complete", extra={
-        "model": model,
+        "requested_model": model,
+        "actual_model": actual_model,
         "latency_ms": r["latency_ms"],
         "primary_role": parsed.get("primary_role") if isinstance(parsed, dict) else None,
     })
-    return {"parsed_json": parsed, "model": model, **r}
+    return {"parsed_json": parsed, **r}
 
 
 def call_summary(normalized_json: Dict[str, Any]) -> Dict[str, Any]:
-    """Generate recruiter-friendly summary using LLM."""
-    model = getattr(settings, "OPENROUTER_SUMMARY_MODEL", "openai/gpt-4o-mini")
+    """Generate recruiter-friendly summary using LLM with fallback models."""
+    model = getattr(settings, "OPENROUTER_SUMMARY_MODEL", "qwen/qwen3-next-80b-a3b-instruct:free")
     temperature = float(getattr(settings, "OPENROUTER_SUMMARY_TEMPERATURE", 0.2))
+    fallback_models = getattr(settings, "OPENROUTER_FALLBACK_MODELS", [])
 
     user_prompt = (
         "Create a recruiter-friendly summary of this candidate.\n\n"
@@ -445,13 +668,21 @@ def call_summary(normalized_json: Dict[str, Any]) -> Dict[str, Any]:
     )
 
     logger.debug("Calling summary LLM", extra={"model": model})
-    r = openrouter_call(model, SUMMARY_SYSTEM_PROMPT, user_prompt, temperature)
+    r = openrouter_call(
+        model=model, 
+        system_prompt=SUMMARY_SYSTEM_PROMPT, 
+        user_prompt=user_prompt, 
+        temperature=temperature,
+        fallback_models=fallback_models,
+    )
     parsed = parse_json_safely(r["content"])
+    actual_model = r.get("model", model)
     logger.info("Summary complete", extra={
-        "model": model,
+        "requested_model": model,
+        "actual_model": actual_model,
         "latency_ms": r["latency_ms"],
     })
-    return {"parsed_json": parsed, "model": model, **r}
+    return {"parsed_json": parsed, **r}
 
 
 REQUIREMENTS_VALIDATION_SYSTEM_PROMPT = """You are a candidate requirements validator. 
@@ -467,11 +698,12 @@ Be strict but fair:
 
 def call_requirements_validation(candidate_data: Dict[str, Any], requirements: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Use LLM to validate if candidate meets requirements.
+    Use LLM to validate if candidate meets requirements with fallback models.
     Returns: {"meets_requirements": bool, "reasons": [], "confidence": float}
     """
-    model = getattr(settings, "OPENROUTER_CLASSIFY_MODEL", "openai/gpt-4o-mini")
+    model = getattr(settings, "OPENROUTER_CLASSIFY_MODEL", "openai/gpt-oss-20b:free")
     temperature = 0.1  # Low temperature for consistent results
+    fallback_models = getattr(settings, "OPENROUTER_FALLBACK_MODELS", [])
     
     user_prompt = (
         "Evaluate if this candidate meets the job requirements.\n\n"
@@ -492,17 +724,26 @@ def call_requirements_validation(candidate_data: Dict[str, Any], requirements: D
         "- min_confidence: Is the parsing confidence score high enough?\n"
     )
     
-    r = openrouter_call(model, REQUIREMENTS_VALIDATION_SYSTEM_PROMPT, user_prompt, temperature, timeout_s=60)
+    r = openrouter_call(
+        model=model, 
+        system_prompt=REQUIREMENTS_VALIDATION_SYSTEM_PROMPT, 
+        user_prompt=user_prompt, 
+        temperature=temperature, 
+        timeout_s=60,
+        fallback_models=fallback_models,
+    )
     parsed = parse_json_safely(r["content"])
     
     if not isinstance(parsed, dict):
         return {"meets_requirements": False, "reasons": ["LLM validation failed"], "confidence": 0.0}
     
+    actual_model = r.get("model", model)
     return {
+        "parsed_json": parsed,
         "meets_requirements": bool(parsed.get("meets_requirements", False)),
         "reasons": parsed.get("reasons", []),
         "confidence": _clamp01(parsed.get("confidence", 0.0)),
-        "model": model,
+        "model": actual_model,
         "latency_ms": r["latency_ms"],
     }
 

@@ -183,34 +183,80 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
 }
 
-# OpenRouter configuration
-OPENROUTER_API_KEY = "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"
+# =============================================================================
+# OPENROUTER API CONFIGURATION (Free Tier Optimized)
+# =============================================================================
+# API key must be set in .env (never hardcode in source)
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 
-# Extraction model - using Nvidia Nemotron free tier
-# Options: "nvidia/nemotron-3-nano-30b-a3b:free" (free)
-#          "google/gemini-2.0-flash-exp:free" (free, rate limited)
-#          "openai/gpt-4o-mini" (paid, requires credits)
-OPENROUTER_EXTRACT_MODEL = os.getenv('OPENROUTER_EXTRACT_MODEL', 'nvidia/nemotron-3-nano-30b-a3b:free')
+# Free tier models - optimized for best performance on 0 credits plan
+# Models must use :free suffix for free tier access
+# See: https://openrouter.ai/docs/guides/routing/model-variants/free
+
+# Extraction model - gpt-oss-20b has MoE architecture (3.6B active params)
+# for lower latency and supports structured outputs
+OPENROUTER_EXTRACT_MODEL = os.getenv('OPENROUTER_EXTRACT_MODEL', 'openai/gpt-oss-20b:free')
 OPENROUTER_TEMPERATURE = float(os.getenv('OPENROUTER_TEMPERATURE', '0.1'))
 
 # Classification + summary models
-OPENROUTER_CLASSIFY_MODEL = os.getenv('OPENROUTER_CLASSIFY_MODEL', 'nvidia/nemotron-3-nano-30b-a3b:free')
-OPENROUTER_SUMMARY_MODEL = os.getenv('OPENROUTER_SUMMARY_MODEL', 'nvidia/nemotron-3-nano-30b-a3b:free')
+OPENROUTER_CLASSIFY_MODEL = os.getenv('OPENROUTER_CLASSIFY_MODEL', 'openai/gpt-oss-20b:free')
+OPENROUTER_SUMMARY_MODEL = os.getenv('OPENROUTER_SUMMARY_MODEL', 'qwen/qwen3-next-80b-a3b-instruct:free')
 
-# NEW: keep these low for determinism
+# Temperature settings - keep low for determinism
 OPENROUTER_CLASSIFY_TEMPERATURE = float(os.getenv('OPENROUTER_CLASSIFY_TEMPERATURE', '0.1'))
 OPENROUTER_SUMMARY_TEMPERATURE = float(os.getenv('OPENROUTER_SUMMARY_TEMPERATURE', '0.2'))
 
-# (7) Celery + Redis
+# Fallback models for rate limit resilience (free tier)
+# When primary model is rate-limited (429), try these in order
+# See: https://openrouter.ai/docs/guides/routing/model-fallbacks
+# IMPORTANT: OpenRouter API limit is 3 models total (primary + fallbacks = 3 max)
+# This means you can only have 2 fallback models!
+OPENROUTER_FALLBACK_MODELS = [
+    'nvidia/nemotron-3-nano-30b-a3b:free',    # Stable fallback
+    'google/gemini-2.0-flash-exp:free',       # Fast alternative
+]
+
+# Model-specific timeouts (free models may have higher latency)
+OPENROUTER_MODEL_TIMEOUTS = {
+    # Free tier models
+    "openai/gpt-oss-20b:free": 90,
+    "qwen/qwen3-next-80b-a3b-instruct:free": 120,
+    "z-ai/glm-4.5-air:free": 90,
+    "nvidia/nemotron-3-nano-30b-a3b:free": 90,
+    "google/gemini-2.0-flash-exp:free": 90,
+    # Paid models (for future reference)
+    "openai/gpt-4o-mini": 90,
+    "openai/gpt-4o": 120,
+    "anthropic/claude-3-haiku": 90,
+    "anthropic/claude-3-sonnet": 120,
+    "anthropic/claude-3-opus": 180,
+    "google/gemini-pro": 90,
+    "meta-llama/llama-3-8b-instruct": 60,
+}
+OPENROUTER_DEFAULT_TIMEOUT = 120  # Higher default for free tier
+
+# =============================================================================
+# CELERY + REDIS (Windows 11 Optimized)
+# =============================================================================
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
-# Windows compatibility: use 'solo' pool instead of 'prefork' (default)
+
+# Windows 11: Use 'eventlet' for concurrent I/O-bound tasks
 # The 'prefork' pool uses fork() which is not available on Windows
-CELERY_WORKER_POOL = 'solo'
+# Install eventlet with: pip install eventlet
+# Fallback to 'solo' if eventlet has issues
+#
+# IMPORTANT: Do NOT use CELERY_WORKER_POOL setting!
+# Use the -P flag when starting the worker instead:
+#   celery -A config worker -P eventlet -c 8
+# Setting CELERY_WORKER_POOL here causes warnings because patches aren't applied early enough.
+
+# Task prefetching for better throughput
+CELERY_WORKER_PREFETCH_MULTIPLIER = 2
 
 # Task hardening settings
 CELERY_TASK_TIME_LIMIT = 300  # 5 min hard limit - task will be killed after this
@@ -220,7 +266,7 @@ CELERY_TASK_REJECT_ON_WORKER_LOST = True  # Reject task if worker dies unexpecte
 CELERY_TASK_TRACK_STARTED = True  # Track when tasks start executing
 CELERY_RESULT_EXPIRES = 3600  # Results expire after 1 hour
 
-# Task routing (optional - can be used for priority queues)
+# Task routing
 CELERY_TASK_ROUTES = {
     'resumes.tasks.parse_resume_parse_run': {'queue': 'resume_parse'},
 }
@@ -228,19 +274,6 @@ CELERY_TASK_DEFAULT_QUEUE = 'default'
 
 # Enable async parsing by default; allow sync override via ?sync=1
 RESUME_PARSE_ASYNC = os.getenv('RESUME_PARSE_ASYNC', '1') == '1'
-
-# LLM Configuration validation and timeouts per model
-OPENROUTER_MODEL_TIMEOUTS = {
-    "openai/gpt-4o-mini": 90,
-    "openai/gpt-4o": 120,
-    "anthropic/claude-3-haiku": 90,
-    "anthropic/claude-3-sonnet": 120,
-    "anthropic/claude-3-opus": 180,
-    "google/gemini-pro": 90,
-    "meta-llama/llama-3-8b-instruct": 60,
-    "xiaomi/mimo-v2-flash:free": 90,
-}
-OPENROUTER_DEFAULT_TIMEOUT = 90  # Default timeout for unknown models
 
 # -------------------------
 # CORS

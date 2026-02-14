@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 550" width="1100" height="550">
+  <style>
+    text { font-family: Arial, sans-serif; font-size: 14px; }
+    .title { font-size: 24px; font-weight: bold; }
+    .label { font-size: 11px; }
+    .process { font-size: 12px; }
+  </style>
+  
+  <!-- Title -->
+  <text x="550" y="40" text-anchor="middle" class="title">LEVEL 1.2 USER - CANDIDATE MANAGEMENT</text>
+  
+  <!-- USER Entity (Rectangle) -->
+  <rect x="30" y="230" width="80" height="50" fill="none" stroke="black" stroke-width="2"/>
+  <text x="70" y="260" text-anchor="middle">USER</text>
+  
+  <!-- Candidate Management Process (Main) -->
+  <ellipse cx="220" cy="255" rx="75" ry="35" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="220" y="250" text-anchor="middle" class="process">Candidate</text>
+  <text x="220" y="265" text-anchor="middle" class="process">Management</text>
+  
+  <!-- Arrow from USER to Candidate Management -->
+  <line x1="110" y1="255" x2="145" y2="255" stroke="black" stroke-width="1.5"/>
+  <polygon points="145,255 138,250 138,260" fill="black"/>
+  
+  <!-- Sub-process 1: Search Candidates -->
+  <ellipse cx="450" cy="100" rx="75" ry="28" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="450" y="95" text-anchor="middle" class="process">Search</text>
+  <text x="450" y="110" text-anchor="middle" class="process">Candidates</text>
+  
+  <!-- Sub-process 2: Filter by Skills -->
+  <ellipse cx="450" cy="180" rx="75" ry="28" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="450" y="175" text-anchor="middle" class="process">Filter by</text>
+  <text x="450" y="190" text-anchor="middle" class="process">Skills/Role</text>
+  
+  <!-- Sub-process 3: View Details -->
+  <ellipse cx="450" cy="260" rx="75" ry="28" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="450" y="255" text-anchor="middle" class="process">View Candidate</text>
+  <text x="450" y="270" text-anchor="middle" class="process">Details</text>
+  
+  <!-- Sub-process 4: Edit Candidate -->
+  <ellipse cx="450" cy="340" rx="75" ry="28" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="450" y="335" text-anchor="middle" class="process">Edit Candidate</text>
+  <text x="450" y="350" text-anchor="middle" class="process">(Human-in-loop)</text>
+  
+  <!-- Sub-process 5: View Education -->
+  <ellipse cx="450" cy="420" rx="75" ry="28" fill="none" stroke="black" stroke-width="1.5"/>
+  <text x="450" y="415" text-anchor="middle" class="process">View Education</text>
+  <text x="450" y="430" text-anchor="middle" class="process">&amp; Experience</text>
+  
+  <!-- Arrows from Candidate Management to sub-processes -->
+  <line x1="285" y1="230" x2="375" y2="115" stroke="black" stroke-width="1"/>
+  <polygon points="375,115 367,118 370,127" fill="black"/>
+  
+  <line x1="290" y1="240" x2="375" y2="180" stroke="black" stroke-width="1"/>
+  <polygon points="375,180 367,177 368,187" fill="black"/>
+  
+  <line x1="295" y1="255" x2="375" y2="260" stroke="black" stroke-width="1"/>
+  <polygon points="375,260 368,255 368,265" fill="black"/>
+  
+  <line x1="288" y1="275" x2="375" y2="340" stroke="black" stroke-width="1"/>
+  <polygon points="375,340 368,334 366,344" fill="black"/>
+  
+  <line x1="280" y1="285" x2="375" y2="415" stroke="black" stroke-width="1"/>
+  <polygon points="375,415 369,407 365,416" fill="black"/>
+  
+  <!-- Data Store: candidates (right-open box) -->
+  <line x1="680" y1="85" x2="780" y2="85" stroke="black" stroke-width="1.5"/>
+  <line x1="680" y1="85" x2="680" y2="115" stroke="black" stroke-width="1.5"/>
+  <line x1="680" y1="115" x2="780" y2="115" stroke="black" stroke-width="1.5"/>
+  <text x="730" y="105" text-anchor="middle" class="label">candidates</text>
+  
+  <!-- Arrow from Search Candidates to candidates -->
+  <line x1="525" y1="100" x2="680" y2="100" stroke="black" stroke-width="1.5"/>
+  <polygon points="680,100 673,95 673,105" fill="black"/>
+  <text x="600" y="90" text-anchor="middle" class="label">search_query</text>
+  
+  <!-- Data Store: skills (right-open box) -->
+  <line x1="680" y1="165" x2="760" y2="165" stroke="black" stroke-width="1.5"/>
+  <line x1="680" y1="165" x2="680" y2="195" stroke="black" stroke-width="1.5"/>
+  <line x1="680" y1="195" x2="760" y2="195" stroke="black" stroke-width="1.5"/>
+  <text x="720" y="185" text-anchor="middle" class="label">skills</text>
+  
+  <!-- Arrow from Filter by Skills to skills -->
+  <line x1="525" y1="180" x2="680" y2="180" stroke="black" stroke-width="1.5"/>
+  <polygon points="680,180 673,175 673,185" fill="black"/>
+  <text x="600" y="170" text-anchor="middle" class="label">filter_criteria</text>
+  
+  <!-- Arrow from View Details to candidates (bidirectional) -->
+  <line x1="525" y1="250" x2="620" y2="250" stroke="black" stroke-width="1"/>
+  <line x1="620" y1="250" x2="620" y2="115" stroke="black" stroke-width="1"/>
+  <line x1="620" y1="115" x2="680" y2="105" stroke="black" stroke-width="1"/>
+  <polygon points="620,250 627,245 627,255" fill="black"/>
+  <text x="575" y="240" text-anchor="middle" class="label">candidate_id</text>
+  
+  <!-- Arrow from Edit Candidate to candidates -->
+  <line x1="525" y1="330" x2="650" y2="330" stroke="black" stroke-width="1"/>
+  <line x1="650" y1="330" x2="650" y2="115" stroke="black" stroke-width="1"/>
+  <line x1="650" y1="115" x2="680" y2="110" stroke="black" stroke-width="1"/>
+  <polygon points="680,110 673,105 673,115" fill="black"/>
+  <text x="590" y="320" text-anchor="middle" class="label">updated_data</text>
+  
+  <!-- Data Store: candidate_edit_logs (right-open box) -->
+  <line x1="680" y1="325" x2="830" y2="325" stroke="black" stroke-width="1.5"/>
+  <line x1="680" y1="325" x2="680" y2="355" stroke="black" stroke-width="1.5"/>
+  <line x1="680" y1="355" x2="830" y2="355" stroke="black" stroke-width="1.5"/>
+  <text x="755" y="345" text-anchor="middle" class="label">candidate_edit_logs</text>
+  
+  <!-- Arrow from Edit Candidate to candidate_edit_logs -->
+  <line x1="525" y1="350" x2="680" y2="340" stroke="black" stroke-width="1.5"/>
+  <polygon points="680,340 673,335 673,345" fill="black"/>
+  <text x="600" y="365" text-anchor="middle" class="label">audit_log</text>
+  
+  <!-- Data Store: education_entries (right-open box) -->
+  <line x1="680" y1="395" x2="820" y2="395" stroke="black" stroke-width="1.5"/>
+  <line x1="680" y1="395" x2="680" y2="425" stroke="black" stroke-width="1.5"/>
+  <line x1="680" y1="425" x2="820" y2="425" stroke="black" stroke-width="1.5"/>
+  <text x="750" y="415" text-anchor="middle" class="label">education_entries</text>
+  
+  <!-- Data Store: experience_entries (right-open box) -->
+  <line x1="680" y1="440" x2="830" y2="440" stroke="black" stroke-width="1.5"/>
+  <line x1="680" y1="440" x2="680" y2="470" stroke="black" stroke-width="1.5"/>
+  <line x1="680" y1="470" x2="830" y2="470" stroke="black" stroke-width="1.5"/>
+  <text x="755" y="460" text-anchor="middle" class="label">experience_entries</text>
+  
+  <!-- Arrow from View Education to education_entries -->
+  <line x1="525" y1="410" x2="680" y2="410" stroke="black" stroke-width="1.5"/>
+  <polygon points="680,410 673,405 673,415" fill="black"/>
+  
+  <!-- Arrow from View Education to experience_entries -->
+  <line x1="525" y1="430" x2="680" y2="455" stroke="black" stroke-width="1.5"/>
+  <polygon points="680,455 673,450 673,460" fill="black"/>
+</svg>

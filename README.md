@@ -4,10 +4,12 @@ AI-powered resume parsing application for recruiters built with Django and OpenR
 
 ## Features
 
-- **Resume Upload**: Upload PDF and DOCX resume files
-- **AI Extraction**: Uses OpenRouter LLM to extract structured data from resumes
+- **Resume Upload**: Upload PDF and DOCX resume files (Single & Bulk support)
+- **AI Extraction**: Uses OpenRouter LLM with automated fallback to **Groq API**
+- **Requirement Filtering**: Automatically accept or reject candidates based on job-specific criteria (skills, experience, education, etc.)
 - **AI Classification**: Automatically classifies candidates into roles and seniority levels
 - **AI Summary**: Generates recruiter-friendly summaries and highlights
+- **Asynchronous Processing**: Scalable background processing with Celery and Redis
 - **Anti-Hallucination**: Regex verification of contact information (email, phone, links)
 - **Normalized Storage**: Stores candidate data in normalized relational database
 - **Search & Filter**: Search candidates by name, skills, role, confidence, etc.
@@ -28,7 +30,9 @@ parsepro/
 ## Prerequisites
 
 - Python 3.10+
+- Redis Server (for background tasks)
 - OpenRouter API key ([Get one here](https://openrouter.ai/))
+- Groq API key (Optional fallback, [Get one here](https://console.groq.com/))
 
 ## Installation
 
@@ -54,7 +58,15 @@ parsepro/
    OPENROUTER_EXTRACT_MODEL=openai/gpt-4o-mini
    OPENROUTER_TEMPERATURE=0.1
    
-   # Optional: Classification and Summary models (defaults to EXTRACT_MODEL if not set)
+   # Groq Fallback (Optional but Recommended)
+   GROQ_API_KEY=your-groq-api-key-here
+   
+   # Celery & Redis
+   CELERY_BROKER_URL=redis://localhost:6379/0
+   CELERY_RESULT_BACKEND=redis://localhost:6379/0
+   RESUME_PARSE_ASYNC=True
+   
+   # Optional: Classification and Summary models
    OPENROUTER_CLASSIFY_MODEL=openai/gpt-4o-mini
    OPENROUTER_SUMMARY_MODEL=openai/gpt-4o-mini
    OPENROUTER_CLASSIFY_TEMPERATURE=0.1
@@ -75,6 +87,15 @@ parsepro/
 6. **Run the development server**:
    ```bash
    python manage.py runserver
+   ```
+
+7. **Start the Celery worker** (in a separate terminal):
+   ```bash
+   # Windows (using eventlet)
+   celery -A config worker -P eventlet -l info
+   
+   # Linux/Mac
+   celery -A config worker -l info
    ```
 
 The API will be available at `http://localhost:8000/api/v1/`
@@ -105,14 +126,31 @@ The API will be available at `http://localhost:8000/api/v1/`
 
 ### Resumes
 
-- `POST /api/v1/resumes/upload/` - Upload a resume (multipart/form-data)
-  - Requires: `file` (PDF or DOCX)
-  - Returns: `resume_document_id`, `parse_run_id`, `status`, `candidate_id`
+- `POST /api/v1/resumes/upload/` - Upload a resume
+  - Multipart parameters:
+    - `file`: Resume file (PDF/DOCX)
+    - `requirements`: (Optional) JSON string of filtering criteria
+  - Returns: `resume_document_id`, `parse_run_id`, `status`
+
+- `POST /api/v1/resumes/bulk-upload/` - Upload multiple resumes
+  - Multipart parameters:
+    - `files`: List of resume files
+    - `requirements`: (Optional) JSON string of filtering criteria
+  - Returns: Summary of all uploads (Accepted/Rejected counts)
+
+#### Requirement Filtering JSON format:
+```json
+{
+  "required_skills": ["Python", "Django"],
+  "min_years_experience": 3,
+  "required_education_degree": ["Bachelor", "Master"],
+  "required_primary_role": ["Software Engineer"],
+  "use_llm_validation": true
+}
+```
 
 - `GET /api/v1/resume-documents/` - List uploaded resume documents
-
 - `GET /api/v1/parse-runs/{id}/` - Get parse run status and details
-
 - `POST /api/v1/parse-runs/{id}/retry/` - Retry parsing a failed resume
 
 ### Candidates
@@ -203,9 +241,19 @@ OPENROUTER_SUMMARY_TEMPERATURE=0.2
 ```
 
 Other compatible models:
-- `anthropic/claude-3-haiku`
-- `google/gemini-pro`
 - `meta-llama/llama-3-8b-instruct`
+
+### Groq Configuration
+
+Groq is used as a high-speed fallback when OpenRouter hit rate limits.
+
+**API Key**:
+```
+GROQ_API_KEY=your-groq-api-key-here
+```
+
+**Fallback Model**:
+The system is hardcoded to use **`llama-3.3-70b-versatile`** for Groq fallbacks to ensure high-quality extraction and JSON mode support.
 
 ### Temperature
 
@@ -232,11 +280,23 @@ Access admin panel at `http://localhost:8000/admin/` after creating a superuser.
 
 ## Architecture
 
-The application follows a 3-stage pipeline:
+The application follows a resilient 3-stage pipeline:
 
-1. **Input & Extraction**: Upload → Text extraction → Cleaning
-2. **Core Parsing**: LLM extraction → Validation → Normalization
-3. **Output & Analysis**: Database persistence → Search/Filter → Detail views
+1. **Input & Extraction**: Upload → Text extraction → Cleaning → PII extraction (regex)
+2. **Core Parsing**: 
+   - Primary: OpenRouter LLM
+   - Fallback: **Groq API** (triggered automatically on 429 rate limits)
+   - Validation & Normalization
+3. **Analysis & Filtering**: 
+   - Enrichment (Classification/Summary)
+   - Requirement Validation (LLM-based or string-based)
+   - Database persistence
+
+### Resilience & Fallbacks
+
+- **Provider Fallback**: If OpenRouter returns a 429, the system immediately switches to Groq to ensure service continuity.
+- **Model Fallback**: Within OpenRouter, multiple models are tried in sequence if the primary is unavailable.
+- **Rate Limit Handling**: The Groq client respects `Retry-After` headers and tracks quota usage via `x-ratelimit` headers.
 
 ### Anti-Hallucination Strategy
 

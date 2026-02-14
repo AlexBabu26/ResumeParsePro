@@ -1,6 +1,16 @@
-body { min-height: 100vh; }
-.sidebar { min-height: calc(100vh - 56px); }
+/* =============================================================================
+   Parse Pro AI - Custom Styles
+   ============================================================================= */
 
+body { 
+  min-height: 100vh; 
+}
+
+.sidebar { 
+  min-height: calc(100vh - 56px); 
+}
+
+/* JSON display styling */
 .json-pre {
   max-height: 420px;
   overflow: auto;
@@ -16,3 +26,115 @@ body { min-height: 100vh; }
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
+/* =============================================================================
+   File Upload Enhancements
+   ============================================================================= */
+
+/* File preview list styling */
+#filePreviewList .list-group-item {
+  transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+  border-left: 3px solid transparent;
+}
+
+#filePreviewList .list-group-item:hover {
+  background-color: #f8f9fa;
+  border-left-color: #0d6efd;
+}
+
+/* File icon animations */
+#filePreviewList .bi-file-earmark-pdf-fill,
+#filePreviewList .bi-file-earmark-word-fill,
+#filePreviewList .bi-file-earmark-text-fill {
+  transition: transform 0.2s ease-in-out;
+}
+
+#filePreviewList .list-group-item:hover .bi-file-earmark-pdf-fill,
+#filePreviewList .list-group-item:hover .bi-file-earmark-word-fill,
+#filePreviewList .list-group-item:hover .bi-file-earmark-text-fill {
+  transform: scale(1.1);
+}
+
+/* Remove button hover effect */
+.remove-file-btn {
+  opacity: 0.6;
+  transition: opacity 0.2s ease-in-out, transform 0.15s ease-in-out;
+}
+
+.remove-file-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+#filePreviewList .list-group-item:hover .remove-file-btn {
+  opacity: 1;
+}
+
+/* Progress bar custom styling */
+#overallProgressBar {
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: width 0.3s ease-in-out;
+}
+
+/* Upload button states */
+#uploadBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* File size warning badge */
+#fileWarning {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Bulk results section styling */
+#bulkResultsDetails .list-group-item {
+  border-left: 3px solid transparent;
+}
+
+#bulkResultsDetails .list-group-item:has(.text-success) {
+  border-left-color: #198754;
+  background-color: rgba(25, 135, 84, 0.05);
+}
+
+#bulkResultsDetails .list-group-item:has(.text-danger) {
+  border-left-color: #dc3545;
+  background-color: rgba(220, 53, 69, 0.05);
+}
+
+#bulkResultsDetails .list-group-item:has(.text-warning) {
+  border-left-color: #ffc107;
+  background-color: rgba(255, 193, 7, 0.05);
+}
+
+/* Min-width utility */
+.min-w-0 {
+  min-width: 0;
+}
+
+/* Text truncation with ellipsis */
+.text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Smooth badge transitions */
+.badge {
+  transition: all 0.2s ease-in-out;
+}
+
+/* File count badge pulse effect when files are added */
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+#fileCountBadge {
+  animation: pulse 0.5s ease-in-out;
+}

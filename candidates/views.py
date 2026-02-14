@@ -158,15 +158,36 @@ class CandidateViewSet(viewsets.ModelViewSet):
                 before_snapshot=before,
                 after_snapshot=after,
             )
+            
+            # Build a user-friendly message about what changed
+            changed_fields = list(changes.keys())
+            if len(changed_fields) == 1:
+                change_msg = f"{changed_fields[0].replace('_', ' ').title()} has been updated."
+            elif len(changed_fields) <= 3:
+                change_msg = f"{', '.join(f.replace('_', ' ') for f in changed_fields)} have been updated."
+            else:
+                change_msg = f"{len(changed_fields)} fields have been updated."
+        else:
+            change_msg = "No changes were made."
 
         # Return full detail payload
-        return ok(CandidateDetailSerializer(candidate).data, status=200)
+        return ok(
+            CandidateDetailSerializer(candidate).data,
+            status=200,
+            message=change_msg
+        )
 
     @action(detail=True, methods=["get"], url_path="edit-logs")
     def edit_logs(self, request, pk=None):
+        """Get the edit history for a candidate."""
         candidate = self.get_object()
         logs = candidate.edit_logs.order_by("-edited_at")
-        return ok(CandidateEditLogSerializer(logs, many=True).data, status=200)
+        
+        return ok(
+            CandidateEditLogSerializer(logs, many=True).data,
+            status=200,
+            message=f"Found {logs.count()} edit(s) for this candidate." if logs.exists() else "No edits have been made to this candidate yet."
+        )
 
     @action(detail=False, methods=["get"], url_path="export")
     def export(self, request):
