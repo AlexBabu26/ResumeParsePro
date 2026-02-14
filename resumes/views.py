@@ -15,199 +15,14 @@ from core.responses import ok, fail
 from .models import ResumeDocument, ParseRun
 from .serializers import ResumeDocumentSerializer, ResumeUploadSerializer, BulkResumeUploadSerializer, ParseRunSerializer
 from .tasks import parse_resume_parse_run
+from .requirements_helpers import _candidate_meets_requirements
 
 from candidates.models import Candidate
 
 logger = logging.getLogger(__name__)
 
 
-class ExtractionError(Exception):
-    """Base exception for text extraction errors."""
-    def __init__(self, message: str, error_code: str):
-        super().__init__(message)
-        self.error_code = error_code
-
-
-def _extract_text_from_pdf(file_path: str) -> str:
-    """
-    Extract text from PDF file using pdfminer.
-    
-    Raises:
-        ExtractionError: With specific error codes for different failure modes.
-    """
-    try:
-        from pdfminer.high_level import extract_text
-        from pdfminer.pdfparser import PDFSyntaxError
-        from pdfminer.pdfdocument import PDFEncryptionError
-    except ImportError as e:
-        logger.error("pdfminer not installed", extra={"error": str(e)})
-        raise ExtractionError("PDF extraction library not available", "MISSING_DEPENDENCY")
-    
-    try:
-        text = extract_text(file_path) or ""
-        if not text.strip():
-            logger.warning("PDF extraction returned empty text", extra={"file_path": file_path})
-        return text
-    except PDFEncryptionError:
-        logger.warning("PDF is password protected", extra={"file_path": file_path})
-        raise ExtractionError("PDF is password protected", "PASSWORD_PROTECTED")
-    except PDFSyntaxError as e:
-        logger.warning("PDF syntax error (corrupted)", extra={"file_path": file_path, "error": str(e)})
-        raise ExtractionError(f"PDF appears to be corrupted: {str(e)}", "CORRUPTED_PDF")
-    except Exception as e:
-        logger.error("PDF extraction failed", extra={"file_path": file_path, "error": str(e)})
-        raise ExtractionError(f"PDF extraction failed: {str(e)}", "PDF_EXTRACTION_ERROR")
-
-
-def _extract_text_from_docx(file_path: str) -> str:
-    """
-    Extract text from DOCX file using python-docx.
-    
-    Raises:
-        ExtractionError: With specific error codes for different failure modes.
-    """
-    try:
-        import docx
-        from docx.opc.exceptions import PackageNotFoundError
-    except ImportError as e:
-        logger.error("python-docx not installed", extra={"error": str(e)})
-        raise ExtractionError("DOCX extraction library not available", "MISSING_DEPENDENCY")
-    
-    try:
-        doc = docx.Document(file_path)
-        parts = []
-        
-        # Extract paragraphs
-        for p in doc.paragraphs:
-            if p.text:
-                parts.append(p.text)
-        
-        # Extract tables
-        for table in doc.tables:
-            for row in table.rows:
-                row_text = " | ".join(cell.text.strip() for cell in row.cells if cell.text)
-                if row_text:
-                    parts.append(row_text)
-        
-        # Extract headers and footers
-        for section in doc.sections:
-            if section.header:
-                for p in section.header.paragraphs:
-                    if p.text and p.text not in parts:
-                        parts.insert(0, p.text)
-        
-        text = "\n".join(parts)
-        if not text.strip():
-            logger.warning("DOCX extraction returned empty text", extra={"file_path": file_path})
-        return text
-        
-    except PackageNotFoundError:
-        logger.warning("DOCX file not found or invalid", extra={"file_path": file_path})
-        raise ExtractionError("DOCX file is invalid or corrupted", "CORRUPTED_DOCX")
-    except Exception as e:
-        logger.error("DOCX extraction failed", extra={"file_path": file_path, "error": str(e)})
-        raise ExtractionError(f"DOCX extraction failed: {str(e)}", "DOCX_EXTRACTION_ERROR")
-
-
-def _extract_text_from_doc(file_path: str) -> str:
-    """
-    Extract text from legacy .doc file using docx2txt.
-    
-    Raises:
-        ExtractionError: With specific error codes for different failure modes.
-    """
-    try:
-        import docx2txt
-    except ImportError as e:
-        logger.error("docx2txt not installed", extra={"error": str(e)})
-        raise ExtractionError("Legacy DOC extraction library not available", "MISSING_DEPENDENCY")
-    
-    try:
-        text = docx2txt.process(file_path) or ""
-        if not text.strip():
-            logger.warning("DOC extraction returned empty text", extra={"file_path": file_path})
-        return text
-    except Exception as e:
-        logger.error("DOC extraction failed", extra={"file_path": file_path, "error": str(e)})
-        raise ExtractionError(f"DOC extraction failed: {str(e)}", "DOC_EXTRACTION_ERROR")
-
-
-def _extract_text_from_txt(file_path: str) -> str:
-    """
-    Extract text from plain text file with encoding detection.
-    
-    Raises:
-        ExtractionError: With specific error codes for different failure modes.
-    """
-    encodings = ['utf-8', 'utf-16', 'latin-1', 'cp1252', 'iso-8859-1']
-    
-    for encoding in encodings:
-        try:
-            with open(file_path, 'r', encoding=encoding) as f:
-                return f.read()
-        except UnicodeDecodeError:
-            continue
-        except Exception as e:
-            logger.error("TXT file read error", extra={"file_path": file_path, "error": str(e)})
-            raise ExtractionError(f"Failed to read text file: {str(e)}", "TXT_READ_ERROR")
-    
-    # Fallback: read with replacement
-    logger.warning("TXT encoding detection failed, using fallback", extra={"file_path": file_path})
-    with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
-        return f.read()
-
-
-def _clean_text(text: str) -> str:
-    """
-    Clean and normalize extracted text for better LLM processing.
-    
-    Improvements:
-    - Unicode normalization (NFKD)
-    - Smart quote replacement
-    - Control character removal
-    - Hyphenated word fixing
-    - Whitespace normalization
-    """
-    if not text:
-        return ""
-    
-    # Unicode normalization (decompose characters)
-    text = unicodedata.normalize('NFKC', text)
-    
-    # Replace smart quotes with standard quotes
-    smart_quotes = {
-        '\u2018': "'",  # Left single quote
-        '\u2019': "'",  # Right single quote
-        '\u201c': '"',  # Left double quote
-        '\u201d': '"',  # Right double quote
-        '\u2013': '-',  # En dash
-        '\u2014': '-',  # Em dash
-        '\u2026': '...',  # Ellipsis
-        '\u00a0': ' ',  # Non-breaking space
-        '\u200b': '',   # Zero-width space
-        '\u200c': '',   # Zero-width non-joiner
-        '\u200d': '',   # Zero-width joiner
-        '\ufeff': '',   # BOM
-    }
-    for char, replacement in smart_quotes.items():
-        text = text.replace(char, replacement)
-    
-    # Remove null bytes and other control characters (except newlines and tabs)
-    text = ''.join(c if c in '\n\t' or (ord(c) >= 32 and ord(c) != 127) else ' ' for c in text)
-    
-    # Fix hyphenated words split across lines (common in PDFs)
-    text = re.sub(r'(\w)-\n(\w)', r'\1\2', text)
-    
-    # Normalize whitespace
-    text = re.sub(r'[ \t]+', ' ', text)  # Multiple spaces/tabs to single space
-    text = re.sub(r' *\n *', '\n', text)  # Remove spaces around newlines
-    text = re.sub(r'\n{3,}', '\n\n', text)  # Max 2 consecutive newlines
-    
-    # Strip leading/trailing whitespace from each line
-    lines = [line.strip() for line in text.split('\n')]
-    text = '\n'.join(lines)
-    
-    return text.strip()
+# Extraction logic moved to resumes.extraction.py
 
 
 def sha256_of_uploaded_file(uploaded_file) -> str:
@@ -646,76 +461,8 @@ class ResumeUploadViewSet(viewsets.ViewSet):
             uploaded_by=request.user,
         )
 
-        # Extract text now (fast and deterministic)
-        try:
-            file_path = doc.file.path
-            name = (doc.original_filename or "").lower()
-            
-            logger.info("Starting text extraction", extra={
-                "document_id": doc.id,
-                "file_name": doc.original_filename,
-                "mime_type": doc.mime_type,
-            })
-
-            if name.endswith(".pdf") or doc.mime_type == "application/pdf":
-                raw = _extract_text_from_pdf(file_path)
-                doc.extraction_method = "pdfminer"
-            elif name.endswith(".docx") or doc.mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-                raw = _extract_text_from_docx(file_path)
-                doc.extraction_method = "python-docx"
-            elif name.endswith(".doc") or doc.mime_type == "application/msword":
-                raw = _extract_text_from_doc(file_path)
-                doc.extraction_method = "docx2txt"
-            elif name.endswith(".txt") or doc.mime_type == "text/plain":
-                raw = _extract_text_from_txt(file_path)
-                doc.extraction_method = "plaintext"
-            else:
-                # Default to DOCX extraction for unknown types
-                logger.warning("Unknown file type, attempting DOCX extraction", extra={
-                    "document_id": doc.id,
-                    "file_name": name,
-                })
-                raw = _extract_text_from_docx(file_path)
-                doc.extraction_method = "python-docx"
-
-            doc.raw_text = _clean_text(raw)
-            doc.save(update_fields=["raw_text", "extraction_method", "updated_at"])
-            
-            logger.info("Text extraction complete", extra={
-                "document_id": doc.id,
-                "extraction_method": doc.extraction_method,
-                "text_length": len(doc.raw_text),
-            })
-            
-        except ExtractionError as e:
-            doc.raw_text = ""
-            doc.extraction_method = "failed"
-            doc.save(update_fields=["raw_text", "extraction_method", "updated_at"])
-            logger.warning("Text extraction failed", extra={
-                "document_id": doc.id,
-                "error_code": e.error_code,
-                "error": str(e),
-            })
-            return fail(
-                str(e),
-                code=e.error_code,
-                status=400
-                # User-friendly message will be auto-applied from ERROR_MESSAGES in core/responses.py
-            )
-        except Exception as e:
-            doc.raw_text = ""
-            doc.extraction_method = "failed"
-            doc.save(update_fields=["raw_text", "extraction_method", "updated_at"])
-            logger.error("Unexpected extraction error", extra={
-                "document_id": doc.id,
-                "error": str(e),
-            })
-            return fail(
-                f"Text extraction failed: {str(e)}",
-                code="TEXT_EXTRACTION_FAILED",
-                status=400,
-                user_message="We couldn't read the content from this file. Please make sure it's a valid resume document and try again."
-            )
+        # Extraction is now handled in the async task
+        logger.info("Scheduling extraction task", extra={"document_id": doc.id, "file_name": doc.original_filename})
 
         # Create ParseRun queued and dispatch (7)
         run = ParseRun.objects.create(
@@ -724,11 +471,12 @@ class ResumeUploadViewSet(viewsets.ViewSet):
             model_name=getattr(settings, "OPENROUTER_EXTRACT_MODEL", "openai/gpt-4o-mini"),
             prompt_version="v1",
             temperature=float(getattr(settings, "OPENROUTER_TEMPERATURE", 0.1)),
+            requirements=requirements,  # Store requirements if provided
         )
 
         sync = request.query_params.get("sync") == "1"
         if getattr(settings, "RESUME_PARSE_ASYNC", True) and not sync:
-            parse_resume_parse_run.delay(run.id)
+            parse_resume_parse_run.delay(run.id, requirements=requirements)
             return ok(
                 {"resume_document_id": doc.id, "parse_run_id": run.id, "status": "queued"},
                 status=202,
@@ -870,49 +618,8 @@ class ResumeUploadViewSet(viewsets.ViewSet):
                     uploaded_by=request.user,
                 )
 
-                # Extract text now (fast and deterministic)
-                try:
-                    file_path = doc.file.path
-                    name = (doc.original_filename or "").lower()
-
-                    if name.endswith(".pdf") or doc.mime_type == "application/pdf":
-                        raw = _extract_text_from_pdf(file_path)
-                        doc.extraction_method = "pdfminer"
-                    elif name.endswith(".docx") or doc.mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-                        raw = _extract_text_from_docx(file_path)
-                        doc.extraction_method = "python-docx"
-                    elif name.endswith(".doc") or doc.mime_type == "application/msword":
-                        raw = _extract_text_from_doc(file_path)
-                        doc.extraction_method = "docx2txt"
-                    elif name.endswith(".txt") or doc.mime_type == "text/plain":
-                        raw = _extract_text_from_txt(file_path)
-                        doc.extraction_method = "plaintext"
-                    else:
-                        raw = _extract_text_from_docx(file_path)
-                        doc.extraction_method = "python-docx"
-
-                    doc.raw_text = _clean_text(raw)
-                    doc.save(update_fields=["raw_text", "extraction_method", "updated_at"])
-                except ExtractionError as e:
-                    doc.raw_text = ""
-                    doc.extraction_method = "failed"
-                    doc.save(update_fields=["raw_text", "extraction_method", "updated_at"])
-                    errors.append({
-                        "filename": f.name,
-                        "error": str(e),
-                        "error_code": e.error_code,
-                    })
-                    continue
-                except Exception as e:
-                    doc.raw_text = ""
-                    doc.extraction_method = "failed"
-                    doc.save(update_fields=["raw_text", "extraction_method", "updated_at"])
-                    errors.append({
-                        "filename": f.name,
-                        "error": f"Text extraction failed: {str(e)}",
-                        "error_code": "TEXT_EXTRACTION_FAILED",
-                    })
-                    continue
+                # Extraction is now handled in the async task
+                logger.info("Scheduling extraction task", extra={"document_id": doc.id, "file_name": doc.original_filename})
 
                 # Create ParseRun queued and dispatch
                 run = ParseRun.objects.create(

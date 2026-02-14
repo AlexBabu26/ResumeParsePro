@@ -13,6 +13,7 @@ from .pipeline import (
     enrich_with_classification_and_summary,
     check_rate_limit_status,
 )
+from .extraction import extract_text_from_file, clean_text, ExtractionError
 from .services import persist_candidate_from_normalized
 from candidates.models import Candidate
 
@@ -122,7 +123,29 @@ def parse_resume_parse_run(self, parse_run_id: int, requirements: dict = None):
         _update_status(run, "processing", "Task started")
 
         if not doc.raw_text:
-            _update_status(run, "failed", "No raw text available")
+            # Attempt extraction within the task if not done yet
+            try:
+                _update_progress(run, "extracting_text")
+                raw, method = extract_text_from_file(doc.file.path, doc.mime_type, doc.original_filename)
+                doc.raw_text = clean_text(raw)
+                doc.extraction_method = method
+                doc.save(update_fields=["raw_text", "extraction_method", "updated_at"])
+                logger.info(f"ParseRun {run.id} text extraction complete", extra={
+                    "parse_run_id": run.id,
+                    "extraction_method": method,
+                    "text_length": len(doc.raw_text),
+                })
+            except Exception as e:
+                _update_status(run, "failed", f"Text extraction failed: {str(e)}")
+                run.error_code = "TEXT_EXTRACTION_FAILED"
+                run.error_message = str(e)
+                run.task_completed_at = timezone.now()
+                run.save(update_fields=["error_code", "error_message", "task_completed_at", "updated_at"])
+                logger.warning(f"ParseRun {run.id} failed: text extraction error", extra={"parse_run_id": run.id, "error": str(e)})
+                return
+
+        if not doc.raw_text:
+            _update_status(run, "failed", "No raw text available after extraction attempt")
             run.error_code = "NO_RAW_TEXT"
             run.error_message = "No raw text extracted from document."
             run.task_completed_at = timezone.now()
@@ -188,7 +211,7 @@ def parse_resume_parse_run(self, parse_run_id: int, requirements: dict = None):
             
             # Check requirements after candidate is created (async mode)
             if requirements:
-                from .views import _candidate_meets_requirements
+                from .requirements_helpers import _candidate_meets_requirements
                 candidate = Candidate.objects.get(id=candidate_id)
                 meets, reasons = _candidate_meets_requirements(candidate, requirements)
                 if not meets:
@@ -198,6 +221,8 @@ def parse_resume_parse_run(self, parse_run_id: int, requirements: dict = None):
                     if not isinstance(run.warnings, list):
                         run.warnings = []
                     run.warnings.append(f"REQUIREMENTS_FAILED: {', '.join(reasons)}")
+                    # Set status to rejected instead of success
+                    status_out = "rejected"
                     logger.info(f"ParseRun {run.id} candidate rejected", extra={
                         "parse_run_id": run.id,
                         "candidate_id": candidate_id,
