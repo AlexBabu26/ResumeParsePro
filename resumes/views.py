@@ -2,6 +2,7 @@ import hashlib
 import logging
 import re
 import unicodedata
+from datetime import datetime
 
 from django.conf import settings
 from rest_framework import permissions, status, viewsets
@@ -297,9 +298,32 @@ class ParseRunViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # (3) Ownership filtering
-        return ParseRun.objects.select_related("resume_document").filter(
+        qs = ParseRun.objects.select_related("resume_document").filter(
             resume_document__uploaded_by=self.request.user
         ).order_by("-created_at")
+
+        # Apply list filters from query params
+        status = (self.request.query_params.get("status") or "").strip()
+        if status:
+            qs = qs.filter(status=status)
+
+        after = (self.request.query_params.get("after") or "").strip()
+        if after:
+            try:
+                after_date = datetime.strptime(after, "%Y-%m-%d").date()
+                qs = qs.filter(created_at__date__gte=after_date)
+            except ValueError:
+                pass
+
+        before = (self.request.query_params.get("before") or "").strip()
+        if before:
+            try:
+                before_date = datetime.strptime(before, "%Y-%m-%d").date()
+                qs = qs.filter(created_at__date__lte=before_date)
+            except ValueError:
+                pass
+
+        return qs
 
     def destroy(self, request, *args, **kwargs):
         """Delete a parse run and its associated candidate (if any)."""
