@@ -1,8 +1,201 @@
+import re
 from django.db import transaction
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 from candidates.models import Candidate, Skill, EducationEntry, ExperienceEntry
 from .models import ResumeDocument, ParseRun
+
+# Model limits (candidates.Skill.name max_length=100, etc.)
+_SKILL_NAME_MAX = 100
+_STR255 = 255
+_DATEISH = re.compile(r"\d{4}")
+
+
+def _coerce_skill_item(s: Any) -> Optional[Dict[str, Any]]:
+    """
+    LLM output sometimes uses skills: ["Python", ...] instead of schema objects.
+    Normalize to a dict so we can persist to Skill.
+    """
+    if isinstance(s, str):
+        name = s.strip()[:_SKILL_NAME_MAX]
+        if not name:
+            return None
+        return {
+            "name": name,
+            "category": None,
+            "confidence": 0.0,
+            "evidence": [],
+        }
+    if isinstance(s, dict):
+        return s
+    return None
+
+
+def _coerce_education_item(ed: Any) -> Optional[Dict[str, Any]]:
+    """LLM may return education as a list of degree strings instead of objects."""
+    if isinstance(ed, str):
+        t = ed.strip()[:_STR255]
+        if not t:
+            return None
+        return {
+            "institution": None,
+            "degree": t,
+            "field_of_study": None,
+            "start_date": None,
+            "end_date": None,
+            "grade": None,
+            "confidence": 0.0,
+            "evidence": [],
+        }
+    if isinstance(ed, dict):
+        return ed
+    return None
+
+
+def _coerce_experience_list(raw: Any) -> List[Dict[str, Any]]:
+    """
+    LLM may return experience as free-form lines (title | company, then a date line).
+    Convert to object-shaped dicts for ExperienceEntry.
+    """
+    if not raw or not isinstance(raw, list):
+        return []
+    out: List[Dict[str, Any]] = []
+    i, n = 0, len(raw)
+    while i < n:
+        ex = raw[i]
+        if isinstance(ex, dict):
+            out.append(ex)
+            i += 1
+            continue
+        if not isinstance(ex, str):
+            i += 1
+            continue
+        line = ex.strip()
+        if not line:
+            i += 1
+            continue
+        d: Dict[str, Any] = {
+            "company": None,
+            "title": None,
+            "employment_type": None,
+            "start_date": None,
+            "end_date": None,
+            "is_current": False,
+            "location": None,
+            "bullets": [],
+            "technologies": [],
+            "confidence": 0.0,
+            "evidence": [],
+        }
+        if "|" in line:
+            a, b = [x.strip() for x in line.split("|", 1)]
+            d["title"] = a[:_STR255] if a else None
+            d["company"] = b[:_STR255] if b else None
+        else:
+            d["title"] = line[:_STR255]
+        nxt = raw[i + 1] if i + 1 < n else None
+        if (
+            isinstance(nxt, str)
+            and nxt.strip()
+            and _DATEISH.search(nxt)
+            and "|" not in nxt
+        ):
+            d["bullets"] = [nxt.strip()]
+            i += 2
+        else:
+            i += 1
+        out.append(d)
+    return out
+
+
+def _coerce_project_item(p: Any) -> Optional[Dict[str, Any]]:
+    if isinstance(p, str):
+        n = p.strip()[:_STR255]
+        if not n:
+            return None
+        return {
+            "name": n,
+            "description": None,
+            "url": None,
+            "technologies": [],
+            "start_date": None,
+            "end_date": None,
+            "confidence": 0.0,
+            "evidence": [],
+        }
+    if isinstance(p, dict):
+        return p
+    return None
+
+
+def _coerce_certification_item(c: Any) -> Optional[Dict[str, Any]]:
+    if isinstance(c, str):
+        n = c.strip()[:_STR255]
+        if not n:
+            return None
+        return {
+            "name": n,
+            "issuer": None,
+            "date_issued": None,
+            "date_expires": None,
+            "credential_id": None,
+            "url": None,
+            "confidence": 0.0,
+            "evidence": [],
+        }
+    if isinstance(c, dict):
+        return c
+    return None
+
+
+def normalize_llm_array_shapes_for_schema(llm_json: Dict[str, Any]) -> None:
+    """
+    LLMs often return skills/education/... as string arrays. The jsonschema expects
+    objects. Coerce in place before validation so the Warnings tab is not filled with
+    '... is not of type object' noise; persistence already accepts these shapes.
+    """
+    if not isinstance(llm_json, dict):
+        return
+
+    sks = llm_json.get("skills")
+    if isinstance(sks, list):
+        out = []
+        for s in sks:
+            c = _coerce_skill_item(s)
+            if c is not None:
+                out.append(c)
+        llm_json["skills"] = out
+
+    eds = llm_json.get("education")
+    if isinstance(eds, list):
+        out = []
+        for ed in eds:
+            c = _coerce_education_item(ed)
+            if c is not None:
+                out.append(c)
+        llm_json["education"] = out
+
+    exs = llm_json.get("experience")
+    if isinstance(exs, list) and any(isinstance(x, str) for x in exs):
+        llm_json["experience"] = _coerce_experience_list(exs)
+
+    prs = llm_json.get("projects")
+    if isinstance(prs, list):
+        out = []
+        for p in prs:
+            c = _coerce_project_item(p)
+            if c is not None:
+                out.append(c)
+        llm_json["projects"] = out
+
+    certs = llm_json.get("certifications")
+    if isinstance(certs, list):
+        out = []
+        for c in certs:
+            x = _coerce_certification_item(c)
+            if x is not None:
+                out.append(x)
+        llm_json["certifications"] = out
 
 
 @transaction.atomic
@@ -35,18 +228,23 @@ def persist_candidate_from_normalized(doc: ResumeDocument, run: ParseRun, normal
     )
 
     for s in normalized.get("skills", []) or []:
-        if not isinstance(s, dict):
+        s = _coerce_skill_item(s)
+        if not s:
+            continue
+        name = (s.get("name") or "").strip()[:_SKILL_NAME_MAX]
+        if not name:
             continue
         Skill.objects.create(
             candidate=candidate,
-            name=s.get("name"),
+            name=name,
             category=s.get("category"),
             confidence=float(s.get("confidence") or 0.0),
             evidence=s.get("evidence") or [],
         )
 
     for ed in normalized.get("education", []) or []:
-        if not isinstance(ed, dict):
+        ed = _coerce_education_item(ed)
+        if not ed:
             continue
         EducationEntry.objects.create(
             candidate=candidate,
@@ -60,9 +258,7 @@ def persist_candidate_from_normalized(doc: ResumeDocument, run: ParseRun, normal
             evidence=ed.get("evidence") or [],
         )
 
-    for ex in normalized.get("experience", []) or []:
-        if not isinstance(ex, dict):
-            continue
+    for ex in _coerce_experience_list(normalized.get("experience")):
         ExperienceEntry.objects.create(
             candidate=candidate,
             company=ex.get("company"),

@@ -105,7 +105,9 @@ class CandidateViewSet(viewsets.ModelViewSet):
                 pass
 
         if skill:
-            qs = qs.filter(skills__name__iexact=skill).distinct()
+            # Substring match: parsed skill names are not normalized to a single token
+            # (e.g. "Python", "Python 3", "Django" / multi-token labels).
+            qs = qs.filter(skills__name__icontains=skill).distinct()
 
         if parse_run:
             qs = qs.filter(parse_run_id=parse_run)

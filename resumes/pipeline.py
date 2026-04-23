@@ -18,6 +18,7 @@ from tenacity import (
 )
 
 from .schema import RESUME_JSON_SCHEMA
+from .services import normalize_llm_array_shapes_for_schema
 from .utils import parse_json_safely
 
 logger = logging.getLogger(__name__)
@@ -531,17 +532,25 @@ def normalize_and_validate(llm_json: Dict[str, Any], raw_text: str, known_pii: D
     warnings: List[str] = []
     missing: List[str] = []
 
-    schema_errors = validate_against_schema(llm_json)
+    # Deep-copy so we do not mutate the object stored as llm_raw_json; coerce string
+    # list items to schema-shaped objects before jsonschema (reduces Warnings tab noise).
+    if isinstance(llm_json, dict):
+        working: Dict[str, Any] = json.loads(json.dumps(llm_json))
+        normalize_llm_array_shapes_for_schema(working)
+    else:
+        working = llm_json  # type: ignore[assignment]
+
+    schema_errors = validate_against_schema(working if isinstance(working, dict) else llm_json)
     if schema_errors:
         warnings.append("jsonschema_validation_failed")
         warnings.extend(schema_errors)
 
     # Start from canonical template (ensures keys exist)
     norm = json.loads(json.dumps(CANONICAL_TEMPLATE))
-    if isinstance(llm_json, dict):
+    if isinstance(working, dict):
         for k in norm.keys():
-            if k in llm_json:
-                norm[k] = llm_json[k]
+            if k in working:
+                norm[k] = working[k]
 
     # anti-hallucination for emails/phones using regex findings
     cand = norm.get("candidate") or {}
